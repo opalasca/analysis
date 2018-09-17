@@ -73,40 +73,39 @@ get_deseq <- function(cts, coldata, sample_list, rowsums){
                               colData = coldata[sample_list,],
                               design = ~ condition)
                               #design = ~ time)
-
-    
   print(nrow(dds))
-  dds <- dds[ rowSums(counts(dds)) > rowsums, ]
+  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
   dds$condition <- relevel(dds$condition, ref = "C")
   dds <- DESeq(dds)
+  print(nrow(dds))
   return(dds)
 }
 
 get_deseq_blood <- function(cts, coldata, from, to, rowsums){
   dds <- DESeqDataSetFromMatrix(countData = cts[,c(from:to)],
                                 colData = coldata[from:to,],
-                                design = ~ condition + time + condition:time)
-                                #design = ~ time + condition:time)
+                                #design = ~ condition + time + condition:time)
+                                design = ~ time + condition + time:condition)
   print(nrow(dds))
-  dds <- dds[ rowSums(counts(dds)) > rowsums, ]
+  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
   dds$condition <- relevel(dds$condition, ref = "C")
-  dds <- DESeq(dds, full= ~ condition + time + condition:time, reduced = ~time + condition, test="LRT")
-  #dds <- DESeq(dds, test="LRT", reduced= ~ 1)
+  #dds <- DESeq(dds, full= ~ condition + time + condition:time, reduced = ~time + condition, test="LRT")
+  dds <- DESeq(dds, test="LRT", reduced= ~ time + condition)
   return(dds)
 }
 
 # draw basic data exploration plots - heatmap, sample distance, PCA. 
 # vsd can be replaced with other normalization results - e.g. rld, ntd   
-basic_plots <-function(dds, vsd, org, tissue){ 
+basic_plots <-function(dds, vsd, org, tissue, type){ 
   #Heatmap
   select <- order(rowMeans(counts(dds,normalized=TRUE)),
                   decreasing=TRUE)[1:20]
   df <- as.data.frame(colData(dds)[,c("condition","time")])
   x <- pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
               cluster_cols=TRUE, annotation_col=df)
-  save_pheatmap_pdf(x, paste("figures/heatmap_", org, "_",tissue,".pdf", sep="")) 
+  save_pheatmap_pdf(x, paste("figures/heatmap_", org, "_",tissue,"_",type,".pdf", sep="")) 
   #Samples-distance plot
   sampleDists <- dist(t(assay(vsd)))
   sampleDistMatrix <- as.matrix(sampleDists)
@@ -116,27 +115,58 @@ basic_plots <-function(dds, vsd, org, tissue){
   x<-pheatmap(sampleDistMatrix,
               clustering_distance_rows=sampleDists,
               clustering_distance_cols=sampleDists,
+              fontsize_row = 20,
               col=colors)
-  save_pheatmap_pdf(x, paste("figures/sample_distance_", org, "_",tissue,".pdf", sep=""),width=9,height=7) 
-  #PCA plot
-  #pdf(paste("figures/PCA_", org, "_",tissue,".pdf", sep=""), width=9, height=7)
-  #z <- plotPCA(vsd, intgroup=c("condition"))
-  #nudge <- position_nudge(y = 1.2)   
-  #z + geom_text(aes(label = name), position = nudge)
-  #dev.off()
+  save_pheatmap_pdf(x, paste("figures/sample_distance_", org, "_",tissue,"_",type,".pdf", sep=""),width=9,height=7) 
+ 
+  plotPCA(vsd, intgroup=c("condition")) +
+    #geom_point(aes(size=25))+
+    aes(label = name)+
+    geom_text_repel()+
+    theme(axis.text=element_text(size=16),axis.title=element_text(size=20,face="bold"),
+          plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))
+  ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=5, height=3.5, dpi = 1000)
+  
 }
 
-get_results <- function(dds, org, tissue, thr){
+get_results <- function(dds, org, tissue, type, thr){
   res_uc_co <- results(dds)#, contrast=c("condition","D","C"))
   resOrdered_uc_co <- as.data.frame(res_uc_co[order(res_uc_co$pvalue),])
   names(resOrdered_uc_co)[names(resOrdered_uc_co) == "log2FoldChange"] = "logFC"
   names(resOrdered_uc_co)[names(resOrdered_uc_co) == "baseMean"] = "avg.expr"
-  resOrdered_uc_co <- subset(resOrdered_uc_co, padj<thr)
+  #resOrdered_uc_co <- subset(resOrdered_uc_co, padj<thr)
   #resOrdered_uc_co <- subset(resOrdered_uc_co, abs(logFC)>2) 
   resOrdered_uc_co$common_id <-tolower(gsub("_.*","",rownames(resOrdered_uc_co)))
-  write.table(resOrdered_uc_co[c(1,2,6,7)], file=paste("results/", org, "_", tissue, "_", thr, "_thr", ".tsv", sep=""), sep="\t")
+  write.table(resOrdered_uc_co[c(1,2,6,7)], file=paste("results/", org, "_", tissue, "_",type, "_", 1, "_thr", ".tsv", sep=""), sep="\t")
+  resOrdered_uc_co <- subset(resOrdered_uc_co, padj<thr)
   return(resOrdered_uc_co)
+  
 }
 
+pca_plot <- function(vsd, org, tissue, type){
+  #org="mouse"; tissue="colon"; type="small"
+  plotPCA(vsd, intgroup=c("condition")) + 
+    aes(label = name,size=9)+
+    geom_text_repel()+
+    theme(axis.text=element_text(size=16),axis.title=element_text(size=18,face="bold"),plot.title = element_text(hjust = 0.5,size=20,face="bold"))
+  ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
 
+}
+
+plot_gene <- function(gene,dds){
+  d <- plotCounts(dds, gene=gene, intgroup="condition", returnData=TRUE)
+  # Plotting the gene normalized counts, using the samplenames (rownames of d as labels)
+  ggplot(d, aes(x = condition, y = count, color = condition)) + 
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    geom_text_repel(aes(label = rownames(d))) + 
+    theme_bw() +
+    ggtitle(gene) +
+    theme(plot.title = element_text(hjust = 0.5))
+} 
+
+get_orth_table <- function(orth_df, test_col, keep_cols){
+  orth_o2o <- orth_df[orth_df[,test_col]=="ortholog_one2one",][,keep_cols]
+  orth_o2o <- orth_o2o[!duplicated(orth_o2o), ]
+  return(orth_o2o)
+}
 
