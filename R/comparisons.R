@@ -6,22 +6,28 @@ res2<-resmc[complete.cases(resmc),]
 res3<-respc[complete.cases(respc),]
 common_mp <- data.frame()
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
-pthr=0.1; thr=0
+pthr=0.1; thr=1
 mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, thr, 0)
-mp<-get_stats(common_mp, "mouse", "pig", 0.1, 0.1, 1, 1, 0)
+mp<-get_stats(common_mp, "mouse", "pig", 0.1, 0.1, thr, thr, 0)
 mp[[1]]
-common<-mp[[2]]
+cons_mpc<-mp[[2]]
 
 #Mouse vs pig blood
+
+res2<-resmb2[complete.cases(resmb2),]
+res3<-respb2[complete.cases(respb2),]
+
 res2<-resmb[complete.cases(resmb),]
 res3<-respb[complete.cases(respb),]
+#res3<-respb5[complete.cases(respb5),]
+
 common_mp <- data.frame()
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
 pthr=0.1; thr=1
 mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.5, thr, thr, 30)
 mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, thr, 0)
 mp[[1]]
-common<-mp[[2]]
+cons_mpb<-mp[[2]]
 
 
 # Human vs mouse vs pig 
@@ -39,8 +45,8 @@ common_hp <- as.data.frame(merge(res1, res3, by.x='Gene.Symbol', by.y='Human.gen
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
 pthr=0.1; thr=1
 hm<-get_stats(common_hm, "human", "mouse", pthr, pthr, thr, thr,0)
-hp<-get_stats(common_hp, "human", "pig", pthr, 0.2, thr, thr, 0)
-mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.2, thr, 1, 0)
+hp<-get_stats(common_hp, "human", "pig", pthr, 0.1, thr, thr, 0)
+mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, 1, 0)
 
 cons_hm<-hm[[2]]
 cons_hp<-hp[[2]]

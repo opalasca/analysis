@@ -63,16 +63,18 @@ psums <- as.matrix(psums[,-1])
 psums = psums[ rowSums(psums)>0, ] 
 cols<-get_colors(nrow(psums))
 
-pdf(paste("figures/", "biotypes_pig", ".pdf", sep=""))
-barchart(t(psums), xlabel="read counts", main="Reads assigned to different gene biotypes", 
+#pdf(paste("figures/", "biotypes_pig", ".pdf", sep=""),width=10, height=5)
+#png(paste("figures/", "biotypes_pig", ".png", sep=""))
+
+bc<-barchart(t(psums), xlabel="read counts", main="Reads assigned to different gene biotypes", 
          col=cols,
-         auto.key=list(space="top", columns=2, title="biotypes", cex.title=1,cex=0.6),
+         auto.key=list(space="right", columns=1, title="biotypes", cex.title=1,cex=1),
          par.settings=list(superpose.polygon=list(col=cols))
 )
-#barchart(t(psums), xlabel="read counts", main="Reads assigned to different gene biotypes", 
-#         auto.key=list(space="top", columns=5, title="biotypes", cex.title=1))
-dev.off()
 
+trellis.device(device="png", filename=paste("figures/", "biotypes_pig", ".png", sep=""), height=600, width=1200)
+print(bc)
+dev.off()
 
 counts <- mcts;genes<-m_biotypes; from=1; to=24;
 counts$id <- rownames(counts)
@@ -80,15 +82,17 @@ d<-as.data.frame(merge(counts, genes, by.x='id', by.y='id'))
 msums <- aggregate(. ~ biotype, data=d[,(from+1):(to+2)], FUN=sum)
 rownames(msums)<-msums$biotype
 msums <- as.matrix(msums[,-1])
-msums = msums[ rowSums(msums)>10000, ] 
+msums = msums[ rowSums(msums)>1000, ] 
 cols<-get_colors(nrow(msums))
 
-pdf(paste("figures/", "biotypes_mouse", ".pdf", sep=""))
-barchart(t(msums), xlabel="read counts", main="Reads assigned to different gene biotypes", 
+#pdf(paste("figures/", "biotypes_mouse", ".pdf", sep=""))
+bc<-barchart(t(msums), xlabel="read counts", main="Reads assigned to different gene biotypes", 
          col=cols,
-         auto.key=list(space="top", columns=2, title="biotypes", cex.title=1,cex=0.6),
+         auto.key=list(space="right", columns=1, title="biotypes", cex.title=1,cex=1),
          par.settings=list(superpose.polygon=list(col=cols))
          )
+trellis.device(device="png", filename=paste("figures/", "biotypes_mouse", ".png", sep=""), height=600, width=1200)
+print(bc)
 dev.off()
 
 

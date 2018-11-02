@@ -31,7 +31,11 @@ dev.off()
 
 
 # Plot top n mouse genes in mouse and pig
-n=20
+resm=resmc
+resp=respc
+ddsm=ddsmc
+ddsp=ddspc
+n=40
 top_mouse <- resm %>%
   arrange(padj) %>% 	#Arrange rows by padj values
   #arrange(desc(avg.expr)) %>% 	#Arrange rows by padj values
@@ -40,14 +44,16 @@ top_mouse <- resm %>%
 not_found=0
 pdf(file=paste("figures/top_mouse.pdf"),width=8, height=3) 
 for (i in 1:n){
-  #i=6
+  i=2
   mouseg=top_mouse[i]
   pig_gene <- resp$id[resp$Mouse.gene.stable.ID == mouseg]
+  gene_name <- (as.vector(resm[resm$id == mouseg,]))[[9]]
   gene_name <- (as.vector(resm[resm$id == mouseg,]))[[9]]
   #human_id <- (as.vector(resm[resm$id == mouseg,]))[[8]]
   #genedesc <- getBM(attributes=c('ensembl_gene_id','entrezgene', 'wikigene_description'), filters = 'ensembl_gene_id', values = c(human_id), mart =ensembl)
   #genedesc$entrezgene
-  if (!identical(pig_gene, character(0))){
+  #if (!identical(pig_gene, character(0))){
+  if (!is.na(pig_gene)){
     plot_two_genes(mouseg, gene_name, ddsm, pig_gene, gene_name, ddsp)
   }
   else {
@@ -72,7 +78,7 @@ for (i in 1:n){
   pigg=top_pig[i]
   mouse_gene <- resm$id[resm$Pig.gene.stable.ID == pigg]
   gene_name <- (as.vector(resp[resp$id == pigg,]))[[9]]
-  if ( !identical(mouse_gene, character(0))){
+  if (!is.na(pig_gene)){
     plot_two_genes(mouse_gene, gene_name, ddsm, pigg, gene_name, ddsp)
   }
   else {
@@ -100,4 +106,73 @@ library("ggpubr")
 #pig_gene="ENSSSCG00000005479"
 #plot_three_genes("ENSSSCG00000005479","IL10",ddsp,"ENSSSCG00000005479","IL10",ddsp,array_expr, groups)
 #plot_array_int("bla", array_expr, groups)
+
+# Plot individual genes #
+#########################
+gene="SLPI"
+#gene="LGMN"
+mouse_gene <- resm$id[resm$Human.gene.name == gene]
+pig_gene <- resp$id[resp$Human.gene.name == gene]
+if (!identical(pig_gene, character(0)) & !identical(mouse_gene, character(0))){
+  plot_two_genes(mouse_gene, gene, ddsm, pig_gene, gene, ddsp)
+}
+png(paste("figures/", gene, "_human.png", sep=""))
+myrow=rownames(annot[annot$Gene.Symbol==gene,])
+groups <- gset@phenoData@data[["description"]]
+p<-plot(jitter(as.integer(groups)),exprs(gset)[myrow,], ylab="log intensity", xaxt="n",
+        xlab="", xlim=c(0.5, nlevels(groups)+0.5), main=gene)
+p+axis(side=1, at=seq_len(nlevels(groups)), label=levels(groups))
+dev.off()
+
+# Plot top genes #
+##################
+resh <- AI_vs_C
+top_human <- resh %>%
+  #arrange(desc(B)) %>% 	#Arrange rows by padj values
+  arrange(logFC) %>% 	#Arrange rows by padj values
+  pull(Gene.Symbol) %>% 		#Extract character vector of ordered genes
+  .[1:30] 		#Extract the fir??st 20 genes
+#pdf(file=paste("figures/top_human.pdf"),width=8, height=3) 
+for (i in 1:20){
+  gene=top_human[i]
+  if (grepl("/",gene)==FALSE){
+    print(gene)
+    mouse_gene <- resm$id[resm$Human.gene.name == gene]
+    pig_gene <- resp$id[resp$Human.gene.name == gene]
+    if (!identical(pig_gene, character(0)) & !identical(mouse_gene, character(0))){
+      plot_two_genes(mouse_gene, gene, ddsm, pig_gene, gene, ddsp)
+    }
+    png(paste("figures/", gene, "_human.png", sep=""))
+    myrow=rownames(resh[resh$Gene.Symbol==gene,])
+    groups <- gset@phenoData@data[["description"]]
+    p<-plot(jitter(as.integer(groups)),exprs(gset)[myrow,], ylab="log intensity", xaxt="n",
+            xlab="", xlim=c(0.5, nlevels(groups)+0.5), main=gene)
+    p+axis(side=1, at=seq_len(nlevels(groups)), label=levels(groups))
+    dev.off()
+  }
+}
+dev.off()
+
+resh <- AI_vs_C
+top_human <- resh %>%
+  arrange(abs(logFC)) %>% 	#Arrange rows by padj values
+  pull(Gene.Symbol)
+for (i in 1:len(top_human)){
+  gene=top_human[i]
+  if (grepl("/",gene)==FALSE){
+    print(gene)
+    mouse_gene <- resm$id[resm$Human.gene.name == gene]
+    pig_gene <- resp$id[resp$Human.gene.name == gene]
+    if (!identical(pig_gene, character(0)) & !identical(mouse_gene, character(0))){
+      plot_two_genes(mouse_gene, gene, ddsm, pig_gene, gene, ddsp)
+    }
+    png(paste("figures/", gene, "_human.png", sep=""))
+    myrow=rownames(resh[resh$Gene.Symbol==gene,])
+    groups <- gset@phenoData@data[["description"]]
+    p<-plot(jitter(as.integer(groups)),exprs(gset)[myrow,], ylab="log intensity", xaxt="n",
+            xlab="", xlim=c(0.5, nlevels(groups)+0.5), main=gene)
+    p+axis(side=1, at=seq_len(nlevels(groups)), label=levels(groups))
+    dev.off()
+  }
+}
 

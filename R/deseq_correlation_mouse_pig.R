@@ -62,3 +62,87 @@ ccs <- as.matrix(assay(vsd))
 ccs <- as.matrix()
 p<-rcorr(ccs, type="pearson")
 s<-rcorr(ccs,type="spearman")
+
+
+#Transform avg intensities per group to percentiles 
+avg_intensities <- as.data.frame(fit.unique[["coefficients"]])
+avg_intensities$mean <- fit.unique$Amean 
+avg_intensities <- merge(avg_intensities,annot["Gene.Symbol"],by="row.names",all.x=TRUE)
+
+data<-get_data("data/pig_strtie_quant_tpm.csv", "data/config_pig.txt")
+tpmp<-data[[1]]; coldatap<-data[[2]]
+data<-get_data("data/mouse_strtie_quant_tpm.csv", "data/config_mouse.txt")
+tpmm<-data[[1]]; coldatam<-data[[2]]
+
+tpmm <- transform_tpm(tpmm, coldatam, "mouse") 
+tpmp <- transform_tpm(tpmp, coldatap, "pig") 
+
+getDE <- function(tpm, samp1, samp2){
+  #tpm<-tpmp;samp1="P20-1"; samp2=
+  res <- tpm[,c("id", samp1, samp2, "Human.gene.stable.ID", "Human.gene.name")]
+  res$logFC <- as.numeric(tpm$samp2) / as.numeric(tpm$samp1)
+  return(res)
+} 
+
+resP20 <- getDE(tpmp,"P20-1","P20-4")
+#avg_intensities <- as.data.frame(fit.unique[["coefficients"]])
+#avg_intensities$mean <- fit.unique$Amean 
+
+IPA <- read.csv('data/IBD_IPA.txt', sep="\t")
+IBD_Reza <- read.csv('data/IBD_genes_Reza.txt', sep="\t", header=FALSE)
+IBD_GWAS <- read.csv('data/IBD_associated_loci_Reza.txt', sep="\t", header=FALSE)
+common_hm <- data.frame()
+common_hp <- data.frame()
+common_mp <- data.frame()
+#res1<-as.data.frame(merge(avg_intensities, AI_vs_C, by.x='Gene.Symbol', by.y='Gene.Symbol'))
+res1<-avg_intensities
+res1<-as.data.frame(merge(avg_intensities, IPA, by.x='Gene.Symbol', by.y='Molecule.Name'))
+res2<-tpmm
+res3<-tpmp
+common_hm <- as.data.frame(merge(res1, res2, by.x='Gene.Symbol', by.y='Human.gene.name'))
+common_hp <- as.data.frame(merge(res1, res3, by.x='Gene.Symbol', by.y='Human.gene.name'))
+common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
+common_mp_filtered <- as.data.frame(merge(common_mp, resm_filtered, by.x='Human.gene.name', by.y='Human.gene.name'))
+
+get_correlations(common_hm, "human", "mouse") 
+get_correlations(common_hp, "human", "pig") 
+
+common_mp = common_mp_filtered
+cor(common_mp$qCD.x, common_mp$qCD.y)
+cor(common_mp$qCD.x, common_mp$qCC.y)
+cor(common_mp$qCC.x, common_mp$qCC.y)
+cor(common_mp$qCC.x, common_mp$qCD.y)
+
+require("lsa")
+cosine(as.matrix(common_hm[,c("AI","C","CD","CC")]))
+cor(as.matrix(common_hm[,c("AI","C","CD","CC")]))
+cosine(as.matrix(common_hp[,c("AI","C","CD","CC")]))
+cor(as.matrix(common_hp[,c("AI","C","CD","CC")]))
+cosine(as.matrix(common_mp[,c("CD.x","CC.x","CD.y","CC.y")]))
+cor(as.matrix(common_mp[,c("CD.x","CC.x","CD.y","CC.y")]))
+
+cosine(as.matrix(common_mp[,c("BD.x","BC.x","BD.y","BC.y")]))
+cor(as.matrix(common_mp[,c("BD.x","BC.x","BD.y","BC.y")]))
+
+drops <- c("Human.gene.stable.ID.x","Human.gene.stable.ID.y","Human.gene.name","id.x","id.y")
+cos_mouse_pig <- cosine(as.matrix(common_mp[, !(names(common_mp) %in% drops)]))
+write.table(cos_mouse_pig, file="results/mouse_pig_cosine.tsv", row.names=T,col.names=NA, sep="\t")
+
+
+
+
+png(paste("figures/hist_AI.png", sep=""))
+qplot(AI, data=avg_intensities, geom='histogram')
+dev.off()
+png(paste("figures/hist_C.png", sep=""))
+qplot(C, data=avg_intensities, geom='histogram')
+dev.off()
+
+png(paste("figures/hist_avg_col_mouse.png", sep=""))
+qplot(CD, data=tpmm, geom='histogram')
+dev.off()
+png(paste("figures/hist_avg_col_pig.png", sep=""))
+qplot(CD, data=tpmp, geom='histogram')
+dev.off()
+
+

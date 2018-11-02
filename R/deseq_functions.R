@@ -74,13 +74,14 @@ get_data_miRNA <- function(counts_file, config_file, n){
   return(data)  
 }
 
-get_deseq <- function(cts, coldata, sample_list, rowsums){
+get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
                               colData = coldata[sample_list,],
                               design = ~ condition)
                               #design = ~ time)
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
   dds$condition <- relevel(dds$condition, ref = "C")
   dds <- DESeq(dds)
@@ -92,7 +93,6 @@ get_deseq_ref_D <- function(cts, coldata, sample_list, rowsums){
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
                                 colData = coldata[sample_list,],
                                 design = ~ condition)
-  #design = ~ time)
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
@@ -116,13 +116,15 @@ get_deseq_mp <- function(cts, coldata, sample_list, rowsums){
   return(dds)
 }
 
-get_deseq_batch <- function(cts, coldata, sample_list, rowsums){
+get_deseq_batch <- function(cts, coldata, sample_list, rowsums,thr){
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
                                 colData = coldata[sample_list,],
                                 design = ~ block + condition)
   #design = ~ time)
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  print(nrow(dds))
+  dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
   dds$condition <- relevel(dds$condition, ref = "C")
   dds <- DESeq(dds, test="LRT", reduced=~block)
@@ -131,70 +133,34 @@ get_deseq_batch <- function(cts, coldata, sample_list, rowsums){
   return(dds)
 }
 
-get_deseq_blood <- function(cts, coldata, sample_list, rowsums){
-  dds <- DESeqDataSetFromMatrix(countData = cts[,c(from:to)],
-                                colData = coldata[from:to,],
-                                #design = ~ condition + time + condition:time)
-                                design = ~ time + condition + time:condition)
-  print(nrow(dds))
-  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
-  print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "C")
-  #dds <- DESeq(dds, full= ~ condition + time + condition:time, reduced = ~time + condition, test="LRT")
-  dds <- DESeq(dds, test="LRT", reduced= ~ time + condition)
-  return(dds)
-}
-
-get_deseq_blood_one_sample <- function(cts, coldata, sample_list, rowsums){
+get_deseq_blood_time <- function(cts, coldata, sample_list, rowsums){
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
                                 colData = coldata[sample_list,],
-                                design = ~ time)
+                                design = ~ subject + time)
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
-  dds$condition <- relevel(dds$time, ref = "0")
-  #dds <- DESeq(dds, full= ~ condition + time + condition:time, reduced = ~time + condition, test="LRT")
-  dds <- DESeq(dds)
+  dds$time <- relevel(dds$time, ref = "0")
+  dds <- DESeq(dds, test="LRT", reduced=~subject)
+  #dds <- DESeq(dds)
   return(dds)
 }
-get_deseq_blood_paired <- function(cts, coldata, sample_list, rowsums){
-  coldata <- coldata[,c(3,4,2,1)]
-  colnames(coldata)[1] <- "condition"
-  colnames(coldata)[4] <- "dcondition"
-  print(coldata)
-  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
-                                colData = coldata[sample_list,],
-                                design = ~ subject + condition)
-  print(nrow(dds))
-  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
-  print(nrow(dds))
-  dds$time <- relevel(dds$condition, ref = "0")
-  dds <- DESeq(dds)
-  return(dds)
-}
-
-get_deseq_blood_batch <- function(cts, coldata, sample_list, rowsums){
-  coldata <- coldata[,c(3,4,2,1)]
-  colnames(coldata)[1] <- "condition"
-  colnames(coldata)[4] <- "dcondition"
-  print(coldata)
-  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
-                                colData = coldata[sample_list,],
-                                design = ~ subject + condition)
-  print(nrow(dds))
-  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
-  print(nrow(dds))
-  dds$time <- relevel(dds$condition, ref = "0")
-  dds <- DESeq(dds)
-  return(dds)
-}
-
 
 # draw basic data exploration plots - heatmap, sample distance, PCA. 
 # vsd can be replaced with other normalization results - e.g. rld, ntd   
-basic_plots <-function(dds, vsd, org, tissue, type){ 
-  pdf(paste("figures/meanSD_", org, "_", tissue, ".pdf", sep=""))
+basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){ 
+  #Mean - SD relationship
+  png(paste("figures/meanSD_", org, "_", tissue, ".png", sep=""))
   meanSdPlot(assay(vsd))
+  dev.off()
+  #Dispersion estimate vs mean
+  png(paste("figures/dispEst_", org, "_", tissue, ".png", sep=""))
+  plotDispEsts(dds)
+  dev.off()
+  #Cook distance boxplot
+  png(paste("figures/CooksDist_", org, "_", tissue, ".png", sep=""))
+  par(mar=c(8,5,2,2))
+  boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2)
   dev.off()
   #Heatmap
   select <- order(rowMeans(counts(dds,normalized=TRUE)),
@@ -217,10 +183,12 @@ basic_plots <-function(dds, vsd, org, tissue, type){
               fontsize_row = 20,
               col=colors)
   save_pheatmap_pdf(x, paste("figures/sample_distance_", org, "_",tissue,"_",type,".pdf", sep=""),width=9,height=7) 
- 
-  plotPCA(vsd, intgroup=c("condition")) +
+  if (time==TRUE) {group="time"}
+  else {group="condition"}
+  print(group)
+  plotPCA(vsd, intgroup=c(group)) +
     #geom_point(aes(size=25))+
-    aes(label = name)+
+    aes(label = name) +
     geom_text_repel()+
     theme(axis.text=element_text(size=16),axis.title=element_text(size=20,face="bold"),
           plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))
@@ -228,10 +196,13 @@ basic_plots <-function(dds, vsd, org, tissue, type){
   
 }
 
-get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biotypes ){
+get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biotypes,timepoint){
   if (tissue=="colon"){
     res <- results(dds, independentFiltering = FALSE, contrast=c("condition","D","C"))
   }
+  if (tissue=="blood"){
+    res <- results(dds, independentFiltering = FALSE, contrast=c("time",timepoint,"0"))
+    }
   resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
   names(resOrdered)[names(resOrdered) == "log2FoldChange"] = "logFC"
   names(resOrdered)[names(resOrdered) == "baseMean"] = "avg.expr"
@@ -502,5 +473,5 @@ get_stats <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfcthr2,
   write.table(opposite, file=paste("results/inconsistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
   colnames(out) <- c("total", species1, species2, "consistent", "opposite" )
   data <- list(out, sig, opposite)
-  return(out)
+  return(data)
 }
