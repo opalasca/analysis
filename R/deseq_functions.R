@@ -36,6 +36,10 @@ get_data <- function(counts_file, config_file){
   cts <- as.matrix(read.csv(counts_file, row.names="gene_id", check.names=FALSE, header=TRUE))
   coldata <- read.csv(config_file, sep="\t", row.names=1)
   coldata$time <- as.factor(coldata$time)
+  coldata$condition <- as.character(coldata$condition)
+  coldata$condition[coldata$condition == "D"] <- "DSS"
+  coldata$condition[coldata$condition == "C"] <- "Control"
+  coldata$condition <- as.factor(coldata$condition)
   if ("block" %in% colnames(coldata)){
     coldata$block <- as.factor(coldata$block)
   }
@@ -51,6 +55,7 @@ get_data_miRNA <- function(counts_file, config_file, n){
   coldata <- data.frame()
   cts <- read.csv(counts_file, check.names=FALSE, header=TRUE, sep="\t")
   colnames(cts)[1]<-"miRNA"
+  cts$miRNA <-tolower(gsub("_.*","",cts$miRNA))
   cts<-cts[order(cts$miRNA,-cts$read_count),]
   cts<-cts[!duplicated(cts$miRNA),]
   cts<-cts[,c(1,5:(n+4))]
@@ -67,6 +72,10 @@ get_data_miRNA <- function(counts_file, config_file, n){
   }
   coldata <- read.csv(config_file, sep="\t", row.names=1)
   coldata$time <- as.factor(coldata$time)
+  coldata$condition <- as.character(coldata$condition)
+  coldata$condition[coldata$condition == "D"] <- "DSS"
+  coldata$condition[coldata$condition == "C"] <- "Control"
+  coldata$condition <- as.factor(coldata$condition)
   all(rownames(coldata) %in% colnames(cts2))
   cts2 <- cts2[, rownames(coldata)]
   all(rownames(coldata) == colnames(cts2))
@@ -83,7 +92,7 @@ get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "C")
+  dds$condition <- relevel(dds$condition, ref = "Control")
   dds <- DESeq(dds)
   print(nrow(dds))
   return(dds)
@@ -96,7 +105,7 @@ get_deseq_ref_D <- function(cts, coldata, sample_list, rowsums){
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "D")
+  dds$condition <- relevel(dds$condition, ref = "DSS")
   dds <- DESeq(dds)
   print(nrow(dds))
   return(dds)
@@ -110,7 +119,7 @@ get_deseq_mp <- function(cts, coldata, sample_list, rowsums){
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "C")
+  dds$condition <- relevel(dds$condition, ref = "Control")
   dds <- DESeq(dds)
   print(nrow(dds))
   return(dds)
@@ -126,7 +135,7 @@ get_deseq_batch <- function(cts, coldata, sample_list, rowsums,thr){
   print(nrow(dds))
   dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "C")
+  dds$condition <- relevel(dds$condition, ref = "Control")
   dds <- DESeq(dds, test="LRT", reduced=~block)
   #dds <- DESeq(dds)
   print(nrow(dds))
@@ -196,28 +205,34 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   
 }
 
-get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biotypes,timepoint){
-  if (tissue=="colon"){
-    res <- results(dds, independentFiltering = FALSE, contrast=c("condition","D","C"))
+get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biotypes, mir_seq=NULL, timepoint){
+  if (timepoint==""){
+    res <- results(dds, independentFiltering = FALSE, contrast=c("condition","DSS","Control"))
   }
-  if (tissue=="blood"){
+  if (tissue=="blood" & timepoint!=""){
     res <- results(dds, independentFiltering = FALSE, contrast=c("time",timepoint,"0"))
     }
   resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
   names(resOrdered)[names(resOrdered) == "log2FoldChange"] = "logFC"
   names(resOrdered)[names(resOrdered) == "baseMean"] = "avg.expr"
   if (type == "small"){ 
-    resOrdered$id <-tolower(gsub("_.*","",rownames(resOrdered)))
+    resOrdered$id <- rownames(resOrdered)
+    resOrdered$partial_id <- gsub("^[^-]*-","",resOrdered$id)
+    resOrdered <- as.data.frame(resOrdered)
+    if (!is.null(mir_seq)){
+      resOrdered <- as.data.frame(merge(resOrdered, mir_seq, by.x='id', by.y='id', all.x=TRUE))
+    }
+    write.table(resOrdered[c(1,2,3,7,8)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
   }
-  else if (type == "total"){
+  else if (startsWith(type, "total")){
     resOrdered$id <- rownames(resOrdered)
     resOrdered$id <- gsub("\\..*","",resOrdered$id)
     resOrdered <- as.data.frame(merge(resOrdered, orth1, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
     resOrdered <- as.data.frame(merge(resOrdered, orth2, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
-  }
-  write.table(resOrdered[c(1,2,6,7,8,9)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t")
+    write.table(resOrdered[c(1,2,3,7,8,9)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    resOrdered <- merge(resOrdered, biotypes, by.x='id',by.y='id', all.x=TRUE)
+}
   #resOrdered_uc_co<-resOrdered_uc_co[resOrdered_uc_co$padj < thr,]
-  resOrdered <- merge(resOrdered, biotypes, by.x='id',by.y='id')
   resSig <- subset(resOrdered, padj <= thr)
   return(resSig)
 }
@@ -286,51 +301,6 @@ plot_two_genes <- function(gene1, gene_name1, dds1, gene2, gene_name2, dds2){
   #ggsave(paste("figures/", gene1,"_", gene2, ".png", sep=""), width=8, height=3, dpi = 1000)
   ggsave(paste("figures/", gene_name1, ".png", sep=""),p, width=8, height=3, dpi = 1000)
   #plot(p)
-} 
-
-plot_three_genes <- function(gene1, gene_name1, dds1, gene2, gene_name2, dds2, array_expr, groups){
-  #https://github.com/hbctraining/DGE_workshop/blob/master/lessons/06_DGE_visualizing_results.md
-  #pdf(file=paste("figures/",gene,".pdf",sep="")) 
-  if (gene1!=""){
-    p1 <- plotCounts(dds1, gene=gene1, intgroup="condition", returnData=TRUE)
-    # Plotting the gene normalized counts, using the samplenames (rownames of d as labels)
-    p11 <- ggplot(p1, aes(x = condition, y = count, fill = condition, color=condition)) + 
-      #geom_point(position=position_jitter(w = 0.05,h = 0)) +
-      geom_dotplot(binaxis="y", stackdir="center")+
-      aes(label = rownames(p1)) +
-      geom_text_repel() +
-      ggtitle(paste(gene1,gene_name1,sep=", ")) +
-      theme(plot.title = element_text(hjust = 0.5))
-  }
-  if (gene2!=""){
-    p2 <- plotCounts(dds2, gene=gene2, intgroup="condition", returnData=TRUE)
-    # Plotting the gene normalized counts, using the samplenames (rownames of d as labels)
-    p22 <- ggplot(p2, aes(x = condition, y = count, color = condition, fill=condition)) + 
-      geom_dotplot(binaxis="y", stackdir="center")+
-      aes(label = rownames(p2)) +
-      geom_text_repel() +
-      ggtitle(paste(gene2,gene_name2,sep=", ")) +
-      theme(plot.title = element_text(hjust = 0.5))
-  }
-  a<-plot_array_int(gene_name1, array_expr, groups)
-  #a<-plot(jitter(as.integer(groups)),array_expr, ylab="log intensity", xaxt="n",
-  #        xlab="",xlim=c(0.5, nlevels(groups)+0.5), main=gene_name1)
-  #a+axis(side=1, at=seq_len(nlevels(groups)), label=levels(groups))
-  if (gene2!="" & gene1!=""){ 
-    #p<-cowplot::plot_grid(p11, p22, a, labels = "AUTO")
-    p<-cowplot::plot_grid(p11,  p22, labels = "AUTO")
-  }
-  else if (gene1==""){
-    p<-cowplot::plot_grid(NULL, p22, a, labels = "AUTO")
-  }
-  else if (gene2==""){
-    p<-cowplot::plot_grid(p11, a , NULL, labels = "AUTO")
-  }
-  plot(p)
-  #ggsave(paste("figures/", gene1,"_", gene2, ".png", sep=""), width=8, height=3, dpi = 1000)
-  ggsave(paste("figures/", gene_name1, ".png", sep=""),p, width=8, height=3, dpi = 1000)
-  #plot(p)
-  plot(a)
 } 
 
 plot_array_int <- function(gene_name1, array_expr, groups){
@@ -406,16 +376,16 @@ addmean <- function(df, samples, name){
 transform_tpm <- function(tpm, coldata, species){
   tpm<-tpm[rowSums( tpm != 0 ) >= 3,] 
   tpm <- log(tpm+1)
-  CC <- rownames(coldata[coldata$tissue=="colon" & coldata$condition=="C",]) 
-  CD <- rownames(coldata[coldata$tissue=="colon" & coldata$condition=="D",]) 
+  CC <- rownames(coldata[coldata$tissue=="colon" & coldata$condition=="Control",]) 
+  CD <- rownames(coldata[coldata$tissue=="colon" & coldata$condition=="DSS",]) 
   CA <- rownames(coldata[coldata$tissue=="colon",])
-  BC <- rownames(coldata[coldata$tissue=="blood" & coldata$time=="1" & coldata$condition=="D",])
-  BC <- rownames(coldata[coldata$tissue=="blood" & coldata$condition=="C",])
+  BC <- rownames(coldata[coldata$tissue=="blood" & coldata$time=="1" & coldata$condition=="DSS",])
+  BC <- rownames(coldata[coldata$tissue=="blood" & coldata$condition=="Control",])
   #BC <- rownames(coldata[coldata$tissue=="blood" & coldata$time=="1",])
   if (species=="mouse"){
-    BD <- rownames(coldata[coldata$tissue=="blood" & coldata$condition=="D" & coldata$time=="3",])}
+    BD <- rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="3",])}
   if (species=="pig"){
-    BD <- rownames(coldata[coldata$tissue=="blood" & coldata$condition=="D" & coldata$time=="4",])}
+    BD <- rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="4",])}
   BA <- rownames(coldata[coldata$tissue=="blood",])
   tpm <- addmean(tpm, CC, "CC")
   tpm <- addmean(tpm, CD, "CD")
@@ -475,3 +445,48 @@ get_stats <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfcthr2,
   data <- list(out, sig, opposite)
   return(data)
 }
+
+get_stats_pval <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfcthr2, exprthr){
+  sig1 <- common[abs(common$logFC.x)>lfcthr1 & common$pvalue.x<pthr1, ]
+  sig2 <- common[abs(common$logFC.y)>lfcthr2 & common$pvalue.y<pthr2, ]
+  sig <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
+                  common$pvalue.x<pthr1 & common$pvalue.y<pthr2 & 
+                  common$avg.expr.y > exprthr &
+                  common$logFC.x*common$logFC.y > 0, ]
+  opposite <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
+                       common$pvalue.x<pthr1 & common$pvalue.y<pthr2 & 
+                       common$logFC.x*common$logFC.y < 0, ]
+  stats <- c(dim(common)[1], dim(sig1)[1], dim(sig2)[1], dim(sig)[1], dim(opposite)[1])
+  #dimnames = list(c(species1, species2, "consistent dysreg", "inconsistent dysreg"),c(""))
+  out <- matrix(stats, nrow = 1)
+  write.table(sig, file=paste("results/consistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
+  write.table(opposite, file=paste("results/inconsistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
+  colnames(out) <- c("total", species1, species2, "consistent", "opposite" )
+  data <- list(out, sig, opposite)
+  return(data)
+}
+heatmap_DE <- function(sig, rld, org, tissue, type){
+  rows <- match(sig$id, row.names(rld))
+  mat <- assay(rld)[rows,]
+  #boxplot(mat)
+  #mat <- mat - rowMeans(mat)
+  #mat<-scale(mat, center = TRUE, scale = TRUE)
+  df <- as.data.frame(colData(rld))
+  df = df[-c(2:5)]
+  #df$condition = "DSS", 
+  annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
+  #heatmap(mat, labCol=annot_heatmap, Colv = NA,  labRow = FALSE)
+  x <- pheatmap(mat, 
+                scale="row",
+                #scale="none",
+                cluster_rows=TRUE, cluster_cols =FALSE, 
+                show_rownames=FALSE,
+                annotation_col=df,
+                annotation_colors = list(condition=c(DSS="darkred", Control="lightgoldenrod3")),
+                key.title = NA,
+                cellwidth=20,
+                col = rev(brewer.pal(11, "RdBu")))
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_",tissue,"_",type,".pdf", sep=""))
+  #,width=9,height=7
+}
+

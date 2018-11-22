@@ -44,7 +44,7 @@ qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
 col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 pie(rep(1,n), col=sample(col_vector, n))
 
-data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
+data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse.txt")
 mcts<-as.data.frame(data[[1]]); mcoldata<-data[[2]]
 data<-get_data("data/gene_count_matrix_pig_annot.csv", "data/config_pig.txt")
 pcts<-as.data.frame(data[[1]]); pcoldata<-data[[2]]
@@ -82,7 +82,7 @@ d<-as.data.frame(merge(counts, genes, by.x='id', by.y='id'))
 msums <- aggregate(. ~ biotype, data=d[,(from+1):(to+2)], FUN=sum)
 rownames(msums)<-msums$biotype
 msums <- as.matrix(msums[,-1])
-msums = msums[ rowSums(msums)>1000, ] 
+msums = msums[ rowSums(msums)>100000, ] 
 cols<-get_colors(nrow(msums))
 
 #pdf(paste("figures/", "biotypes_mouse", ".pdf", sep=""))
@@ -91,7 +91,7 @@ bc<-barchart(t(msums), xlabel="read counts", main="Reads assigned to different g
          auto.key=list(space="right", columns=1, title="biotypes", cex.title=1,cex=1),
          par.settings=list(superpose.polygon=list(col=cols))
          )
-trellis.device(device="png", filename=paste("figures/", "biotypes_mouse", ".png", sep=""), height=600, width=1200)
+trellis.device(device="png", filename=paste("figures/", "biotypes_mouse_reseq", ".png", sep=""), height=600, width=1200)
 print(bc)
 dev.off()
 
