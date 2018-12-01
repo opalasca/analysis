@@ -16,6 +16,8 @@ library("vsn")
 library("ggplot2")
 library(ggrepel)
 library(cowplot)
+require("twbattaglia/btools")
+
 #library("installr")
 
 theme_set(theme_cowplot(font_size=12)) # reduce default font size
@@ -202,15 +204,19 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
     theme(axis.text=element_text(size=16),axis.title=element_text(size=20,face="bold"),
           plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))
   ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=5, height=3.5, dpi = 1000)
-  
+  pdf("figures/PCA_3D.pdf")
+  plotPCA3D(vsd, intgroup = "condition", ntop = 500,
+            returnData = FALSE)
+  dev.off()
+  #ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
 }
 
 get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biotypes, mir_seq=NULL, timepoint){
   if (timepoint==""){
-    res <- results(dds, independentFiltering = FALSE, contrast=c("condition","DSS","Control"))
+    res <- results(dds, independentFiltering = TRUE, contrast=c("condition","DSS","Control"))
   }
   if (tissue=="blood" & timepoint!=""){
-    res <- results(dds, independentFiltering = FALSE, contrast=c("time",timepoint,"0"))
+    res <- results(dds, independentFiltering = TRUE, contrast=c("time",timepoint,"0"))
     }
   resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
   names(resOrdered)[names(resOrdered) == "log2FoldChange"] = "logFC"
@@ -244,7 +250,10 @@ pca_plot <- function(vsd, org, tissue, type){
     geom_text_repel()+
     theme(axis.text=element_text(size=16),axis.title=element_text(size=18,face="bold"),plot.title = element_text(hjust = 0.5,size=20,face="bold"))
   ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
-
+  plotPCA3D(vsd, intgroup = "condition", ntop = 500,
+            returnData = FALSE)
+  ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
+  
 }
 
 plot_gene <- function(gene,gene_name,dds){
@@ -465,28 +474,104 @@ get_stats_pval <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfc
   data <- list(out, sig, opposite)
   return(data)
 }
-heatmap_DE <- function(sig, rld, org, tissue, type){
+
+heatmap_DE <- function(sig, rld, org, tissue, type, title){
   rows <- match(sig$id, row.names(rld))
   mat <- assay(rld)[rows,]
-  #boxplot(mat)
-  #mat <- mat - rowMeans(mat)
-  #mat<-scale(mat, center = TRUE, scale = TRUE)
+  n=dim(mat)[[1]]
   df <- as.data.frame(colData(rld))
-  df = df[-c(2:5)]
-  #df$condition = "DSS", 
+  df = df[-c(2:6)]
+  #breaksList = seq(-2, 2, by = 0.25)
   annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
-  #heatmap(mat, labCol=annot_heatmap, Colv = NA,  labRow = FALSE)
   x <- pheatmap(mat, 
                 scale="row",
-                #scale="none",
                 cluster_rows=TRUE, cluster_cols =FALSE, 
                 show_rownames=FALSE,
+                #show_colnames=FALSE,
                 annotation_col=df,
-                annotation_colors = list(condition=c(DSS="darkred", Control="lightgoldenrod3")),
-                key.title = NA,
+                annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
+                #annotation_legend = FALSE,
+                #annotation_names_col = FALSE,
+                #annotation_col=c("DSS","Control"),
+                key.title = "Row-wise Z-score",
+                #breaks = breaksList,
+                border_color = "NA",
+                #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
                 cellwidth=20,
-                col = rev(brewer.pal(11, "RdBu")))
+                main=paste(title,",n=",n,sep=""))
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_",tissue,"_",type,".pdf", sep=""))
   #,width=9,height=7
 }
 
+heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
+  rows <- match(sig$id, row.names(rld))
+  mat <- assay(rld)[rows,]
+  n=dim(mat)[[1]]
+  df <- as.data.frame(colData(rld))
+  df = df[-c(1,2,4,5,6)]
+  breaksList = seq(-2, 2, by = 0.25)
+  if (org=="mouse"){
+    time_colors = list(time=c("0"="grey80", "2"="grey50", "8"="grey30"))
+  }
+  else{
+    time_colors = list(time=c("0"="grey80", "2"="grey60", "4"="grey40", "5"="grey25"))
+  }
+  annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
+  x <- pheatmap(mat, 
+                scale="row",
+                cluster_rows=TRUE,
+                cluster_cols=FALSE, 
+                show_rownames=FALSE,
+                #show_colnames=FALSE,
+                annotation_col=df,
+                #annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
+                annotation_colors = time_colors,
+                #annotation_legend = FALSE,
+                #annotation_names_col = FALSE,
+                #annotation_col=c("DSS","Control"),
+                key.title = "Row-wise Z-score",
+                #breaks = breaksList,
+                border_color = "NA",
+                #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
+                cellwidth=20,
+                main=paste(title,",n=",n,sep="") )
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_TS_", org, "_",tissue,"_",type,".pdf", sep=""))
+  #,width=9,height=7
+}
+
+
+plotPCA3D <- function (object, intgroup = "condition", ntop = 500, returnData = FALSE){
+  rv <- rowVars(assay(object))
+  select <- order(rv, decreasing = TRUE)[seq_len(min(ntop, length(rv)))]
+  pca <- prcomp(t(assay(object)[select, ]))
+  percentVar <- pca$sdev^2/sum(pca$sdev^2)
+  if (!all(intgroup %in% names(colData(object)))) {
+    stop("the argument 'intgroup' should specify columns of colData(dds)")
+  }
+  intgroup.df <- as.data.frame(colData(object)[, intgroup, drop = FALSE])
+  group <- if (length(intgroup) > 1) {
+    factor(apply(intgroup.df, 1, paste, collapse = " : "))
+  }
+  else {
+    colData(object)[[intgroup]]
+  }
+  d <- data.frame(PC1 = pca$x[, 1],
+                  PC2 = pca$x[, 2],
+                  PC3 = pca$x[, 3],
+                  group = group,
+                  intgroup.df,
+                  name = colnames(object))
+  if (returnData) {
+    attr(d, "percentVar") <- percentVar[1:3]
+    return(d)
+  }
+  message("Generating plotly plot")
+  p <- plotly::plot_ly(data = d,
+                       x = ~PC1,
+                       y = ~PC2,
+                       z = ~PC3,
+                       color = group,
+                       mode = "markers",
+                       type = "scatter3d")
+  return(p)
+}

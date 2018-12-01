@@ -1,13 +1,15 @@
 
 #Mouse colon vs blood total
 res2<-resmc
-res3<-resmb
+res3<-resmb8
 common_mcbt <- data.frame()
 common_mcbt <- as.data.frame(merge(res2, res3, by.x='id', by.y='id'))
 pthr=0.1; thr=1
 mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
 mp[[1]]
 cons_mcbt<-mp[[2]]
+dim(cons_mcbt[cons_mcbt$logFC.x<1,])
+cons_lnc <- cons_mcbt[cons_mcbt$biotype.x %in% lncRNAs,]
 
 #Mouse colon vs blood small
 res2<-resmcs
@@ -68,7 +70,7 @@ res2<-resmc[complete.cases(resmc),]
 res3<-respc[complete.cases(respc),]
 common_mp <- data.frame()
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
-pthr=0.1; thr=1
+pthr=0.1; thr=0.5
 mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, thr, 0)
 mp<-get_stats(common_mp, "mouse", "pig", 0.1, 0.1, thr, thr, 0)
 mp[[1]]
