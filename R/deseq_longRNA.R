@@ -110,7 +110,7 @@ cts<-cts[rownames(cts) %in% pig_genes_to_keep$id,]
 dim(cts)
 colon_samples=rownames(coldata[coldata$tissue=="colon",]) 
 #colon_samples=rownames(coldata[coldata$tissue=="colon" & coldata$subject!="P20" & coldata$subject!="P17",]) 
-#colon_samples=rownames(coldata[coldata$tissue=="colon" & coldata$subject!="P17",]) 
+#colon_samples=rownames(coldata[coldata$tissue=="colon" & coldata$subject!="P15",]) 
 #colon_samples=rownames(coldata[coldata$tissue=="colon" & coldata$subject!="P20",]) 
 #ddsp <- get_deseq_ref_D(cts, coldata, colon_samples, 3)
 ddsp<-NULL
@@ -125,15 +125,15 @@ respc <- as.data.frame(get_results(ddsp, "pig", "colon", "total", 1, ph_orth, pm
 ddspc<-ddsp
 boxplot(assay(rldc))
 res<-respc
-lfcthr=0; pthr=0.1
+lfcthr=1; pthr=0.1
 siglncc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype %in% lncRNAs,]
 sigpcc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype=="protein_coding",]
 heatmap_DE(sigpcc,rldc,"pig","colon","total_protein_coding","Protein coding genes")
 heatmap_DE(siglncc,rldc,"pig","colon","total_lncRNA","LncRNAs")
-dim(sigpcb[sigpcc$logFC>1,])
-dim(sigpcb[sigpcc$logFC<1,])
-dim(siglncb[siglncc$logFC>1,])
-dim(siglncb[siglncc$logFC<1,])
+dim(sigpcc[sigpcc$logFC>1,])
+dim(sigpcc[sigpcc$logFC<1,])
+dim(siglncc[siglncc$logFC>1,])
+dim(siglncc[siglncc$logFC<1,])
 
 #plotPCA3D(vsd, intgroup = "condition", ntop = 500,returnData = FALSE)
 
@@ -166,7 +166,7 @@ dim(sigpcb[sigpcb$logFC<1,])
 dim(siglncb[siglncb$logFC>1,])
 dim(siglncb[siglncb$logFC<1,])
 
-plotPCA3D(vsd, intgroup = "subject", ntop = 500,returnData = FALSE)
+#plotPCA3D(vsd, intgroup = "subject", ntop = 500,returnData = FALSE)
 
 
 

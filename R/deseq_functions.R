@@ -16,7 +16,7 @@ library("vsn")
 library("ggplot2")
 library(ggrepel)
 library(cowplot)
-require("twbattaglia/btools")
+#require("twbattaglia/btools")
 
 #library("installr")
 
@@ -52,6 +52,44 @@ get_data <- function(counts_file, config_file){
   return(data)  
 }
 
+get_data_miRNA_v2 <- function(counts_file, config_file, n){
+  cts <- data.frame()
+  coldata <- data.frame()
+  cts <- read.csv(counts_file, check.names=FALSE, header=TRUE, sep="\t")
+  colnames(cts)[1]<-"miRNA"
+  #cts$miRNA <-tolower(gsub("_.*","",cts$miRNA))
+  cts<-cts[order(cts$miRNA,-cts$read_count),]
+  cts<-cts[!duplicated(cts$miRNA),]
+  cts<-cts[,c(1,5:(n+4))]
+  # Assign the first column as row names
+  cts2 <- cts[,-1]
+  cts <- as.matrix(cts)
+  rownames(cts2) <- cts[,1]
+  sample_names <- read.csv("data/config_mirdeep2.txt", sep="\t", header=FALSE)
+  if (n==24){
+    colnames(cts2) <- sample_names[1:n,1]
+  }
+  else{
+    colnames(cts2) <- sample_names[25:(n+24),1]
+  }
+  
+  coldata <- read.csv(config_file, sep="\t", row.names=1)
+  coldata$time <- as.factor(coldata$time)
+  coldata$condition <- as.character(coldata$condition)
+  coldata$condition[coldata$condition == "D"] <- "DSS"
+  coldata$condition[coldata$condition == "C"] <- "Control"
+  coldata$condition <- as.factor(coldata$condition)
+  if ("block" %in% colnames(coldata)){
+    coldata$block <- as.factor(coldata$block)
+  }
+  
+  all(rownames(coldata) %in% colnames(cts2))
+  cts2 <- cts2[, rownames(coldata)]
+  all(rownames(coldata) == colnames(cts2))
+  data <- list(cts2, coldata)
+  return(data)  
+}
+
 get_data_miRNA <- function(counts_file, config_file, n){
   cts <- data.frame()
   coldata <- data.frame()
@@ -84,6 +122,7 @@ get_data_miRNA <- function(counts_file, config_file, n){
   data <- list(cts2, coldata)
   return(data)  
 }
+
 
 get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
@@ -213,9 +252,11 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
 
 get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biotypes, mir_seq=NULL, timepoint){
   if (timepoint==""){
+    print("no timepoint")
     res <- results(dds, independentFiltering = TRUE, contrast=c("condition","DSS","Control"))
   }
   if (tissue=="blood" & timepoint!=""){
+    print("time given")
     res <- results(dds, independentFiltering = TRUE, contrast=c("time",timepoint,"0"))
     }
   resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
@@ -485,8 +526,9 @@ heatmap_DE <- function(sig, rld, org, tissue, type, title){
   annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
   x <- pheatmap(mat, 
                 scale="row",
-                cluster_rows=TRUE, cluster_cols =FALSE, 
-                show_rownames=FALSE,
+                cluster_rows=TRUE,
+                cluster_cols =FALSE, 
+                #show_rownames=FALSE,
                 #show_colnames=FALSE,
                 annotation_col=df,
                 annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
@@ -521,7 +563,7 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
                 scale="row",
                 cluster_rows=TRUE,
                 cluster_cols=FALSE, 
-                show_rownames=FALSE,
+                #show_rownames=FALSE,
                 #show_colnames=FALSE,
                 annotation_col=df,
                 #annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
@@ -575,3 +617,31 @@ plotPCA3D <- function (object, intgroup = "condition", ntop = 500, returnData = 
                        type = "scatter3d")
   return(p)
 }
+
+
+return_sig<-function(res1,res2,res3,lfc,pval){
+  if (!is.null(res1)){
+    sig1<-res1[abs(res1$logFC)>lfc & res1$pvalue<pval ,]
+  }
+  if (!is.null(res2)){
+    sig2<-res2[abs(res2$logFC)>lfc & res2$pvalue<pval ,]
+  }
+  if (!is.null(res3)){
+    sig3<-res3[abs(res3$logFC)>lfc & res3$pvalue<pval ,]
+  }
+  if ( !is.null(res1) & is.null(res2) & is.null(res3) ){
+    sig <- sig1
+  } 
+  else if ( !is.null(res1) & !is.null(res2) & is.null(res3) ){
+    sig <-merge(sig1, sig2, by.x='id', by.y='id',all=TRUE)
+  }
+  else if ( !is.null(res1) & !is.null(res2) & !is.null(res3) ){
+    print("here")
+    sigtmp <-merge(sig1, sig2, by.x='id', by.y='id', all.x=TRUE,all.y=TRUE)
+    sig <-merge(sigtmp, sig3, by.x='id', by.y='id',all.x=TRUE, all.y=TRUE)
+  }
+  return(sig)
+}
+
+
+

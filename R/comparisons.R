@@ -4,12 +4,33 @@ res2<-resmc
 res3<-resmb8
 common_mcbt <- data.frame()
 common_mcbt <- as.data.frame(merge(res2, res3, by.x='id', by.y='id'))
+common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
+common_mcbt <- common_mcbt[(common_mcbt$biotype.x %in% lncRNAs),]
 pthr=0.1; thr=1
 mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
 mp[[1]]
 cons_mcbt<-mp[[2]]
 dim(cons_mcbt[cons_mcbt$logFC.x<1,])
 cons_lnc <- cons_mcbt[cons_mcbt$biotype.x %in% lncRNAs,]
+cons_pc <- cons_mcbt[cons_mcbt$biotype.x=="protein_coding",]
+
+
+#Pig colon vs blood total
+res2<-respc
+res3<-respb4
+common_mcbt <- data.frame()
+common_mcbt <- as.data.frame(merge(res2, res3, by.x='id', by.y='id'))
+common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
+#common_mcbt <- common_mcbt[(common_mcbt$biotype.x %in% lncRNAs),]
+pthr=0.1; thr=1
+mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
+mp[[1]]
+cons_mcbt<-mp[[2]]
+
+library(knitr) 
+mph<-kable(mp[[1]], format = "html")
+library(htmlwidgets)
+saveWidget(mph, file="results/m.html")
 
 #Mouse colon vs blood small
 res2<-resmcs

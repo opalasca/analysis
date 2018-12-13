@@ -114,3 +114,12 @@ reads<-c(mc,mb,pc,pb)
 barchart(reads,xlim=c(0,90000000), xlabel="read counts", main="Reads assigned to protein coding genes")
 dev.off()
 
+mir_mouse <- read.csv('data/mir_W_g0/miRNAs_expressed_all_samples_1543837195.csv', sep="\t", header=TRUE)
+mir_pig <- read.csv('data/mir_W_g0/miRNAs_expressed_all_samples_1543837223.csv', sep="\t", header=TRUE)
+
+cts<-mir_mouse
+cts<-mir_pig
+names<-cts[,1]
+cts<-as.matrix(   cts[ ,c(5:((ncol(cts)-4)/2 + 4)) ]  )
+#rownames(cts) <- names
+colSums(cts)
