@@ -1,3 +1,7 @@
+source("../integrated_miRNA_analysis/R/geo2R_GSE48957.R")
+source("../integrated_miRNA_analysis/R/geo2R_GSE32273.R")
+
+
 
 #Mouse colon vs blood total
 res2<-resmc
@@ -66,7 +70,7 @@ cons_mcbt<-mp[[2]]
 res2<-resmcs
 res3<-UCa_vs_C_merged
 common_mcbt <- data.frame()
-common_mcbt <- as.data.frame(merge(res2, res3, by.x='partial_id', by.y='partial_id'))
+common_mcbt <- as.data.frame(merge(res2, res3, by.x='seq', by.y='Sequence'))
 pthr=0.1; thr=0
 mp<-get_stats(common_mcbt,  "mouse", "human", pthr, pthr, thr, thr, 0)
 mp[[1]]

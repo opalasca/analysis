@@ -134,6 +134,7 @@ dim(sigpcc[sigpcc$logFC>1,])
 dim(sigpcc[sigpcc$logFC<1,])
 dim(siglncc[siglncc$logFC>1,])
 dim(siglncc[siglncc$logFC<1,])
+hist(respc$pvalue)
 
 #plotPCA3D(vsd, intgroup = "condition", ntop = 500,returnData = FALSE)
 
