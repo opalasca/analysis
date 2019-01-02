@@ -16,6 +16,9 @@ library("vsn")
 library("ggplot2")
 library(ggrepel)
 library(cowplot)
+library(knitr) 
+library("fdrtool") 
+
 #require("twbattaglia/btools")
 
 #library("installr")
@@ -52,7 +55,7 @@ get_data <- function(counts_file, config_file){
   return(data)  
 }
 
-get_data_miRNA_v2 <- function(counts_file, config_file, n){
+get_data_miRNA_v2 <- function(counts_file, config_file, n, selected){
   cts <- data.frame()
   coldata <- data.frame()
   cts <- read.csv(counts_file, check.names=FALSE, header=TRUE, sep="\t")
@@ -86,6 +89,9 @@ get_data_miRNA_v2 <- function(counts_file, config_file, n){
   all(rownames(coldata) %in% colnames(cts2))
   cts2 <- cts2[, rownames(coldata)]
   all(rownames(coldata) == colnames(cts2))
+  print(nrow(cts2))
+  cts2 <- cts2[rownames(cts2) %in% selected,]
+  print(nrow(cts2))
   data <- list(cts2, coldata)
   return(data)  
 }
@@ -130,11 +136,57 @@ get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
                               design = ~ condition)
                               #design = ~ time)
   print(nrow(dds))
-  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
-  dds<-dds[rowSums(counts(dds)) >= thr,] 
+  dds <- estimateSizeFactors(dds)
+  mnc <- rowMeans(counts(dds, normalized=TRUE))
+  dds <- dds[mnc > 3,]
+  #dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  #dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
   dds$condition <- relevel(dds$condition, ref = "Control")
   dds <- DESeq(dds)
+  print(nrow(dds))
+  return(dds)
+}
+
+get_deseq_time_cond_merged <- function(cts, coldata, sample_list, rowsums, thr, refcond){
+  # A design that takes all blood samples into consideration, by treating all control timepoints,
+  # together with day0DSS as control
+  coldata$timecond <- paste("day",coldata$time,"_",coldata$condition,sep="")
+  coldata$timecond[coldata$condition=="Control"] <- "day0_DSS" 
+  coldata$timecond <- as.factor(coldata$timecond)
+  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
+                                colData = coldata[sample_list,],
+                                design = ~ timecond)
+  print(nrow(dds))
+  dds <- estimateSizeFactors(dds)
+  mnc <- rowMeans(counts(dds, normalized=TRUE))
+  dds <- dds[mnc > 3,]
+  print(nrow(dds))
+  dds$timecond <- relevel(dds$timecond, ref = refcond)
+  dds <- DESeq(dds)
+  print(nrow(dds))
+  return(dds)
+}
+
+get_deseq_time_cond_merged_plus_batch <- function(cts, coldata, sample_list, rowsums, thr, refcond){
+  # A design that takes all blood samples into consideration, by treating all control timepoints,
+  # together with day0DSS as control
+  # subject batch effect needed for pig - helps a lot with the p val distribution
+  coldata$timecond <- paste("day",coldata$time,"_",coldata$condition,sep="")
+  coldata$timecond[coldata$condition=="Control"] <- "day0_DSS" 
+  coldata$timecond <- as.factor(coldata$timecond)
+  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
+                                colData = coldata[sample_list,],
+                                design = ~ subject + timecond)
+                               
+  print(nrow(dds))
+  dds <- estimateSizeFactors(dds)
+  mnc <- rowMeans(counts(dds, normalized=TRUE))
+  dds <- dds[mnc > 3,]
+  print(nrow(dds))
+  dds$timecond <- relevel(dds$timecond, ref = refcond)
+  print(colData(dds))
+  dds <- DESeq(dds, test="LRT", reduced=~subject)
   print(nrow(dds))
   return(dds)
 }
@@ -152,25 +204,10 @@ get_deseq_ref_D <- function(cts, coldata, sample_list, rowsums){
   return(dds)
 }
 
-get_deseq_mp <- function(cts, coldata, sample_list, rowsums){
-  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
-                                colData = coldata[sample_list,],
-                                design = ~ batch + condition)
-  #design = ~ time)
-  print(nrow(dds))
-  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
-  print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "Control")
-  dds <- DESeq(dds)
-  print(nrow(dds))
-  return(dds)
-}
-
 get_deseq_batch <- function(cts, coldata, sample_list, rowsums,thr){
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
                                 colData = coldata[sample_list,],
                                 design = ~ block + condition)
-  #design = ~ time)
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
@@ -178,7 +215,6 @@ get_deseq_batch <- function(cts, coldata, sample_list, rowsums,thr){
   print(nrow(dds))
   dds$condition <- relevel(dds$condition, ref = "Control")
   dds <- DESeq(dds, test="LRT", reduced=~block)
-  #dds <- DESeq(dds)
   print(nrow(dds))
   return(dds)
 }
@@ -192,10 +228,32 @@ get_deseq_blood_time <- function(cts, coldata, sample_list, rowsums){
   print(nrow(dds))
   dds$time <- relevel(dds$time, ref = "0")
   dds <- DESeq(dds, test="LRT", reduced=~subject)
-  #dds <- DESeq(dds)
   return(dds)
 }
 
+get_deseq_blood_time_no_subject <- function(cts, coldata, sample_list, rowsums){
+  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
+                                colData = coldata[sample_list,],
+                                design = ~ time)
+  print(nrow(dds))
+  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  print(nrow(dds))
+  dds$time <- relevel(dds$time, ref = "0")
+  dds <- DESeq(dds)
+  return(dds)
+}
+
+get_deseq_blood_time_full <- function(cts, coldata, sample_list, rowsums){
+  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
+                                colData = coldata[sample_list,],
+                                design = ~ condition + time + condition:time)
+  print(nrow(dds))
+  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  print(nrow(dds))
+  dds$time <- relevel(dds$time, ref = "0")
+  dds <- DESeq(dds, test="LRT", reduced = ~ condition + time)
+  return(dds)
+}
 # draw basic data exploration plots - heatmap, sample distance, PCA. 
 # vsd can be replaced with other normalization results - e.g. rld, ntd   
 basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){ 
@@ -220,7 +278,7 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   #print(df)
   x <- pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
               cluster_cols=TRUE, annotation_col=df)
-  save_pheatmap_pdf(x, paste("figures/heatmap_", org, "_",tissue,"_",type,".pdf", sep="")) 
+  #save_pheatmap_pdf(x, paste("figures/heatmap_", org, "_",tissue,"_",type,".pdf", sep="")) 
   #Samples-distance plot
   sampleDists <- dist(t(assay(vsd)))
   sampleDistMatrix <- as.matrix(sampleDists)
@@ -250,15 +308,19 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   #ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
 }
 
-get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biotypes, mir_seq=NULL, timepoint){
-  if (timepoint==""){
+get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, mir_seq=NULL, timepoint, cond1, cond2){
+  if (timepoint=="" & is.null(cond1)){
     print("no timepoint")
-    res <- results(dds, independentFiltering = TRUE, contrast=c("condition","DSS","Control"))
+    res <- results(dds, independentFiltering = FALSE, contrast=c("condition","DSS","Control"))
   }
-  if (tissue=="blood" & timepoint!=""){
+  if (tissue=="blood" & timepoint!="" & is.null(cond1)){
     print("time given")
-    res <- results(dds, independentFiltering = TRUE, contrast=c("time",timepoint,"0"))
-    }
+    res <- results(dds, independentFiltering = FALSE, contrast=c("time",timepoint,"0"))
+  }
+  if (!is.null(cond1) & !is.null(cond2)){
+    print("time and condition merged")
+    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("timecond",cond1,cond2))
+  }
   resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
   names(resOrdered)[names(resOrdered) == "log2FoldChange"] = "logFC"
   names(resOrdered)[names(resOrdered) == "baseMean"] = "avg.expr"
@@ -266,6 +328,7 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp",biot
     resOrdered$id <- rownames(resOrdered)
     resOrdered$partial_id <- gsub("^[^-]*-","",resOrdered$id)
     resOrdered <- as.data.frame(resOrdered)
+    resOrdered$biotype <- "miRNA"
     if (!is.null(mir_seq)){
       resOrdered <- as.data.frame(merge(resOrdered, mir_seq, by.x='id', by.y='id', all.x=TRUE))
     }
@@ -516,12 +579,12 @@ get_stats_pval <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfc
   return(data)
 }
 
-heatmap_DE <- function(sig, rld, org, tissue, type, title){
+heatmap_DE <- function(sig, rld, org, tissue, type, title, timepoint){
   rows <- match(sig$id, row.names(rld))
   mat <- assay(rld)[rows,]
   n=dim(mat)[[1]]
   df <- as.data.frame(colData(rld))
-  df = df[-c(2:6)]
+  df = df[-c(2:7)]
   #breaksList = seq(-2, 2, by = 0.25)
   annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
   x <- pheatmap(mat, 
@@ -541,8 +604,10 @@ heatmap_DE <- function(sig, rld, org, tissue, type, title){
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
                 cellwidth=20,
                 main=paste(title,",n=",n,sep=""))
-  save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_",tissue,"_",type,".pdf", sep=""))
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type, "_", timepoint, ".pdf", sep=""))
   #,width=9,height=7
+  clust <- cbind(mat, cluster = cutree(x$tree_row, k = 5))
+  return(clust)
 }
 
 heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
@@ -579,6 +644,8 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
                 main=paste(title,",n=",n,sep="") )
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_TS_", org, "_",tissue,"_",type,".pdf", sep=""))
   #,width=9,height=7
+  clust <- cbind(mat, cluster = cutree(x$tree_row, k = 6))
+  return(clust)
 }
 
 
@@ -619,15 +686,15 @@ plotPCA3D <- function (object, intgroup = "condition", ntop = 500, returnData = 
 }
 
 
-return_sig<-function(res1,res2,res3,lfc,pval){
+return_sig<-function(res1,res2,res3,lfc,pval,padj,biotypes){
   if (!is.null(res1)){
-    sig1<-res1[abs(res1$logFC)>lfc & res1$pvalue<pval ,]
+    sig1<-res1[abs(res1$logFC)>lfc & res1$pvalue<pval & res1$padj<padj & res1$biotype %in% biotypes,]
   }
   if (!is.null(res2)){
-    sig2<-res2[abs(res2$logFC)>lfc & res2$pvalue<pval ,]
+    sig2<-res2[abs(res2$logFC)>lfc & res2$pvalue<pval & res2$padj<padj & res2$biotype %in% biotypes,]
   }
   if (!is.null(res3)){
-    sig3<-res3[abs(res3$logFC)>lfc & res3$pvalue<pval ,]
+    sig3<-res3[abs(res3$logFC)>lfc & res3$pvalue<pval & res3$padj<padj & res3$biotype %in% biotypes,]
   }
   if ( !is.null(res1) & is.null(res2) & is.null(res3) ){
     sig <- sig1
@@ -643,5 +710,52 @@ return_sig<-function(res1,res2,res3,lfc,pval){
   return(sig)
 }
 
+filter_overlapping_mirs <- function(seqf){
+  seqf<-seqf[order(seqf$seq),]
+  selected_mirs=c()
+  seqf[] <- lapply(seqf, as.character)
+  i=2
+  while (i<length(seqf$seq)){
+    #while (i<10){
+    k=1
+    a<-grepl(seqf[i-1,2],seqf[i,2])
+    if (a==TRUE){
+      b=TRUE; k=i;
+      while (b==TRUE){
+        b<-grepl(seqf[k,2],seqf[k+1,2])
+        k=k+1
+      }  
+      low=i-1; high=k-1;
+      if((high-low)>0){
+        print(paste(low, high, sep=" "))
+        i=k+1
+        print(seqf[low:high,])
+        sim <- seqf[low:high,] #data frame with similar miRNAs 
+        annot_sim <- sim[grep("mir", sim$id), ] # data frame with similar miRNAs annotated in miRBase
+        #print(annot_sim)
+        if (nrow(annot_sim)==0) { 
+          mir <- sim[nrow(sim),]$id
+          #print(paste("longest mir, mirdeep found: ",mir,sep=""))
+          selected_mirs <- c(selected_mirs, mir)
+        }
+        else {
+          mir <- annot_sim[nrow(annot_sim),]$id
+          #print(paste("longest mir from mirbase: ",mir,sep=""))
+          selected_mirs <- c(selected_mirs, mir)
+        }
+      } 
+    }
+    else{ 
+      mir <- seqf[i-1,]$id
+      #print(paste("mir not overlapping others, included: ",mir, sep=""))
+      selected_mirs <- c(selected_mirs, mir )
+      i=i+1
+    } 
+  }  
+  if (i<length(seqf$seq)){
+    selected_mirs <- c(selected_mirs, seqf[i,]$id)
+  }
+  return(selected_mirs)
+}  
 
 

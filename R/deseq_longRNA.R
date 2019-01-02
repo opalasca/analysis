@@ -23,6 +23,7 @@ pig_genes_to_keep <- p_biotypes[!(p_biotypes$biotype %in% biotypes_to_remove),]
 
 lncRNAs=c("lincRNA","antisense", "3prime_overlapping_ncRNA","bidirectional_promoter_lncRNA",
           "processed_transcript", "sense_intronic","sense_overlapping")
+protein_coding=c("protein_coding")
 
 data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
 cts<-NULL; coldata<-NULL
@@ -38,7 +39,7 @@ vsd <- vst(ddsm, blind=FALSE) ##
 rldc <- rlog(ddsm, blind=TRUE)
 basic_plots(ddsm, rldc, "mouse", "colon","total",FALSE)
 resmc<-NULL
-resmc <- as.data.frame(get_results(ddsm, "mouse", "colon", "total", 1, mh_orth, mp_orth, m_biotypes, NULL,""))
+resmc <- as.data.frame(get_results(ddsm, "mouse", "colon", "total", 1, mh_orth, mp_orth, m_biotypes, NULL,"",NULL,NULL))
 ddsmc<-ddsm
 res<-resmc
 
@@ -64,11 +65,11 @@ rldb <- rlog(ddsm, blind=TRUE)
 meanSdPlot(assay(vsd))
 basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
 resmb<-NULL
-resmb <- get_results(ddsm, "mouse", "blood","total", 1, mh_orth, mp_orth, m_biotypes,NULL,"")
+resmb <- get_results(ddsm, "mouse", "blood","total", 1, mh_orth, mp_orth, m_biotypes,NULL,"",NULL,NULL)
 ddsmb <- ddsm
 boxplot(assay(rldb))
 res<-resmb
-lfcthr=1; pthr=0.1
+lfcthr=0; pthr=0.1
 siglncb <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype %in% lncRNAs,]
 sigpcb <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype=="protein_coding",]
 heatmap_DE(sigpcb,rldb,"mouse","blood","total_protein_coding","Protein coding genes")
@@ -77,6 +78,28 @@ dim(sigpcb[sigpcb$logFC>1,])
 dim(sigpcb[sigpcb$logFC<1,])
 dim(siglncb[siglncb$logFC<1,])
 dim(siglncb[siglncb$logFC>1,])
+
+#Mouse blood all samples
+data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse.txt")
+#data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
+cts<-data[[1]]; coldata<-data[[2]]
+cts<-cts[rownames(cts) %in% mouse_genes_to_keep$id,]
+blood_samples=rownames(coldata[coldata$tissue=="blood",])
+#ddsm <- get_deseq(cts, coldata, blood_samples, 1, 0)
+ddsm <- get_deseq_time_cond_merged(cts, coldata, blood_samples, 1, 0,"day0_DSS")
+vsd <- vst(ddsm, blind=FALSE) ##rld <- rlog(dds, blind=FALSE); ntd <- normTransform(dds)
+rldb <- rlog(ddsm, blind=TRUE)
+meanSdPlot(assay(vsd))
+basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
+resmb<-NULL
+resmb <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth, pm_orth, 
+                                   m_biotypes, NULL,"","day8_DSS","day0_DSS"))
+ddsmb <- ddsm
+boxplot(assay(rldb))
+sig<-return_sig(resmb, NULL, NULL, 0, 0.05, 0.1, protein_coding)
+heatmap_DE(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes")
+sig<-return_sig(resmb, NULL, NULL, 0, 0.05, 0.1, lncRNAs)
+heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs")
 
 #Mouse blood time series, DSS treated
 data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse.txt")
@@ -89,17 +112,18 @@ rldb <- rlog(ddsm, blind=TRUE); #ntd <- normTransform(dds)
 meanSdPlot(assay(vsd))
 basic_plots(ddsm, rldb, "mouse", "blood", "total",TRUE)
 resmb<-NULL
-resmb8 <- get_results(ddsm, "mouse", "blood","total_ts8vs0", 1, mh_orth, mp_orth, m_biotypes,NULL,"8")
+resmb8 <- get_results(ddsm, "mouse", "blood","total_ts8vs0", 1, mh_orth, mp_orth, m_biotypes,NULL,"8",NULL,NULL)
 resmb2<-NULL
-resmb2 <- get_results(ddsm, "mouse", "blood","total_ts2vs0", 1, mh_orth, mp_orth, m_biotypes,NULL,"2")
+resmb2 <- get_results(ddsm, "mouse", "blood","total_ts2vs0", 1, mh_orth, mp_orth, m_biotypes,NULL,"2",NULL,NULL)
 ddsmb <- ddsm
 boxplot(assay(rldb))
-lfcthr=1; pthr=0.1
+lfcthr=0; pthr=0.1
 res<-resmb8
 siglnc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype %in% lncRNAs,]
 sigpc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype=="protein_coding",]
 heatmap_DE_ts(sigpc,rldb,"mouse","blood","total_protein_coding","Protein coding")
 heatmap_DE_ts(siglnc,rldb,"mouse","blood","total_lncRNA","LncRNAs")
+hist(resmb8$pvalue)
 
 
 data<-get_data("data/gene_count_matrix_pig_annot.csv", "data/config_pig.txt")
@@ -121,7 +145,7 @@ rldc <- rlog(ddsp, blind=TRUE);
 meanSdPlot(assay(vsd))
 basic_plots(ddsp, rldc, "pig", "colon","total",FALSE)
 respc<-NULL
-respc <- as.data.frame(get_results(ddsp, "pig", "colon", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,""))
+respc <- as.data.frame(get_results(ddsp, "pig", "colon", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"",NULL,NULL))
 ddspc<-ddsp
 boxplot(assay(rldc))
 res<-respc
@@ -151,9 +175,9 @@ rldb <- rlog(ddsp, blind=TRUE);
 meanSdPlot(assay(vsd))
 basic_plots(ddsp, rldb, "pig", "blood", "total", TRUE)
 respb<-NULL
-respb4 <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"4"))
-respb2 <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"2"))
-respb5 <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"5"))
+respb4 <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"4",NULL,NULL))
+respb2 <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"2",NULL,NULL))
+respb5 <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"5",NULL,NULL))
 res<-respb4
 ddspb <- ddsp
 boxplot(assay(rldb))
