@@ -1,5 +1,6 @@
 source("../integrated_miRNA_analysis/R/geo2R_GSE48957.R")
 source("../integrated_miRNA_analysis/R/geo2R_GSE32273.R")
+setwd("~/Desktop/IBD/BGI_analysis")
 
 
 
@@ -76,17 +77,7 @@ mp<-get_stats(common_mcbt,  "mouse", "human", pthr, pthr, thr, thr, 0)
 mp[[1]]
 cons_mcbt<-mp[[2]]
 
-#Mouse blood vs human UC blood GSE32273
-res2<-resmbs
-#res3<-UCpl_vs_Cpl_merged
-res3<-UCm_vs_Cm_merged
-#res3<-UCP_vs_CP_merged
-common_mcbt <- data.frame()
-common_mcbt <- as.data.frame(merge(res2, res3, by.x='partial_id', by.y='partial_id'))
-pthr=0.3; thr=0
-mp<-get_stats(common_mcbt,  "mouse", "human", pthr, pthr, thr, thr, 0)
-mp[[1]]
-cons_mcbt<-mp[[2]]
+
 
 # LogFC comparisons between mouse and pig 
 
@@ -103,9 +94,6 @@ cons_mpc<-mp[[2]]
 
 #Mouse vs pig total blood
 
-res2<-resmb8[complete.cases(resmb8),]
-res3<-respb4[complete.cases(respb4),]
-
 res2<-resmb[complete.cases(resmb),]
 res3<-respb[complete.cases(respb),]
 #res3<-respb5[complete.cases(respb5),]
@@ -113,7 +101,7 @@ res3<-respb[complete.cases(respb),]
 common_mp <- data.frame()
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
 pthr=0.1; thr=1
-mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.5, thr, thr, 30)
+#mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.5, thr, thr, 30)
 mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, thr, 0)
 mp[[1]]
 cons_mpb<-mp[[2]]
@@ -145,8 +133,82 @@ hp[[1]]
 mp[[1]]
 
 
-#selected <- subset(common_hp, abs(common_hp$logFC.x)>2 & abs(common_hp$logFC.y)>2) #& common$logFC.x*common$logFC.y > 0
+#Mouse blood small vs human UC blood GSE32273
+res1<-resmbs
+res2<-UCpl_vs_Cpl_merged
+#res2<-UCP_vs_CP_merged
+res2<-UCm_vs_Cm_merged
+names(res2)[10]="seq"
+res2$seq=toupper(res2$seq)
+res2$seq<-gsub("T", "U", res2$seq)
+res1$partial_seq=substr(res1$seq,1,20)
+res2$partial_seq=substr(res2$seq,1,20)
+res1<-res1[,c(8,10,11,1:3,6:7)]
+res2<-res2[,c(13,10,14,1,6,7,9,8)]
+common_mcbs <- as.data.frame(merge(res1, res2, by.x='partial_id', by.y='partial_id'))
+common_mcbs <- common_mcbs[,c(1,2:3,1,9:10,4:8,11:15),] 
+names(common_mcbs)[c(1,4)]<-c("partial_id.x","partial_id.y")
+common_mcbs_seq <- as.data.frame(merge(res1, res2, by.x='seq', by.y='seq'))
+common_mcbs_seq <- common_mcbs_seq[,c(2,1,3,9,1,10,4:8,11:15),] 
+names(common_mcbs_seq)[c(2,5)]<-c("seq.x","seq.y")
+names(common_mcbs_seq)
+names(common_mcbs)
+common_mcbs=rbind(common_mcbs, common_mcbs_seq)
+common_mcbs <- unique(common_mcbs)
+mirs_same_id_seq_1 <- common_mcbs$partial_id.x
+mirs_same_id_seq_2 <- common_mcbs$partial_id.y
+res1=res1[!(res1$partial_id %in% mirs_same_id_seq_1),]
+res2=res2[!(res2$partial_id %in% mirs_same_id_seq_2),]
+common_mcbs_partial_seq <- as.data.frame(merge(res1, res2, by.x='partial_seq', by.y='partial_seq'))
+common_mcbs_partial_seq <- common_mcbs_partial_seq[,c(2,3,1,9,10,1,4:8,11:15),] 
+names(common_mcbs_partial_seq)[c(3,6)]<-c("partial_seq.x","partial_seq.y")
+names(common_mcbs_partial_seq)
+names(common_mcbs)
+common_mcbs=rbind(common_mcbs, common_mcbs_partial_seq)
+pthr=0.05; thr=0
+mp<-get_stats_pval(common_mcbs,  "mouse", "human", pthr, pthr, thr, thr, 0)
+mp[[1]]
+cons_mcbs<-mp[[2]]
 
+#Mouse vs pig blood small
+res1<-resmbs
+res2<-respbs4
+res1$partial_seq=substr(res1$seq,1,20)
+res2$partial_seq=substr(res2$seq,1,20)
+res1<-res1[,c(8,10,11,1:3,6:7)]
+res2<-res2[,c(8,10,11,1:3,6:7)]
+common_mcbs <- data.frame()
+common_mcbs_id <- data.frame()
+common_mcbs_id_transf <- data.frame()
+common_mcbs_seq <- data.frame()
+common_mcbs <- as.data.frame(merge(res1, res2, by.x='partial_id', by.y='partial_id'))
+common_mcbs <- common_mcbs[,c(1,2:3,1,9:10,4:8,11:15),] 
+names(common_mcbs)[c(1,4)]<-c("partial_id.x","partial_id.y")
+common_mcbs_seq <- as.data.frame(merge(res1, res2, by.x='seq', by.y='seq'))
+common_mcbs_seq <- common_mcbs_seq[,c(2,1,3,9,1,10,4:8,11:15),] 
+names(common_mcbs_seq)[c(2,5)]<-c("seq.x","seq.y")
+names(common_mcbs_seq)
+names(common_mcbs)
+common_mcbs=rbind(common_mcbs, common_mcbs_seq)
+common_mcbs <- unique(common_mcbs)
+
+mirs_same_id_seq_1 <- common_mcbs$partial_id.x
+mirs_same_id_seq_2 <- common_mcbs$partial_id.y
+res1=res1[!(res1$partial_id %in% mirs_same_id_seq_1),]
+res2=res2[!(res2$partial_id %in% mirs_same_id_seq_2),]
+common_mcbs_partial_seq <- as.data.frame(merge(res2, res3, by.x='partial_seq', by.y='partial_seq'))
+common_mcbs_partial_seq <- common_mcbs_partial_seq[,c(2,3,1,9,10,1,4:8,11:15),] 
+names(common_mcbs_partial_seq)
+names(common_mcbs)
+common_mcbs=rbind(common_mcbs, common_mcbs_partial_seq)
+
+pthr=0.1; thr=0
+mp<-get_stats_pval(common_mcbs, "mouse", "pig", pthr, 0.3, thr, thr, 0)
+mp[[1]]
+cons_mcbs<-mp[[2]]
+
+
+#selected <- subset(common_hp, abs(common_hp$logFC.x)>2 & abs(common_hp$logFC.y)>2) #& common$logFC.x*common$logFC.y > 0
 cor(common_hm$logFC.x, common_hm$logFC.y, method="spearman")
 cor(common_hp$logFC.x, common_hp$logFC.y, method="spearman")
 cor(common_mp$logFC.x, common_mp$logFC.y, method="spearman")
@@ -167,5 +229,21 @@ draw_logFC_corr("mouse", "pig", common_mp, 0.05, 0.05)
 write.table(common, file=paste("results/common_",out_name,".tsv",sep=""), sep="\t")
 draw_logFC_corr(acc1, acc2, cp1, cp2, common, 0.1, 0.1)
 draw_volcano_highlight_uncommon(acc1, acc2, cp1, cp2, common_full, res1, res2, 0.1, 0.1)
+
+i=1
+n=0
+for (i in 1:nrow(res2)){
+  seq=substr(res2[i,]$seq,1,20)
+  #print(res[i,]$id)
+  #print(seq)
+  sim <- res3[grep(seq, res3$seq), ] 
+  if (nrow(sim)>0) {
+    print(res[i,]$id)
+    print(sim)
+    n=n+1
+    names(res2[i,])<- paste( names(res2[i,]), ".x", sep="")
+  }
+}  
+print(n)
 
 

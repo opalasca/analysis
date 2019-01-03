@@ -138,7 +138,7 @@ get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
   print(nrow(dds))
   dds <- estimateSizeFactors(dds)
   mnc <- rowMeans(counts(dds, normalized=TRUE))
-  dds <- dds[mnc > 3,]
+  dds <- dds[mnc > 5,]
   #dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   #dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
@@ -178,7 +178,6 @@ get_deseq_time_cond_merged_plus_batch <- function(cts, coldata, sample_list, row
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
                                 colData = coldata[sample_list,],
                                 design = ~ subject + timecond)
-                               
   print(nrow(dds))
   dds <- estimateSizeFactors(dds)
   mnc <- rowMeans(counts(dds, normalized=TRUE))
@@ -210,6 +209,9 @@ get_deseq_batch <- function(cts, coldata, sample_list, rowsums,thr){
                                 design = ~ block + condition)
   print(nrow(dds))
   dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  dds <- estimateSizeFactors(dds)
+  mnc <- rowMeans(counts(dds, normalized=TRUE))
+  dds <- dds[mnc > 5,]
   print(nrow(dds))
   dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
@@ -311,11 +313,11 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
 get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, mir_seq=NULL, timepoint, cond1, cond2){
   if (timepoint=="" & is.null(cond1)){
     print("no timepoint")
-    res <- results(dds, independentFiltering = FALSE, contrast=c("condition","DSS","Control"))
+    res <- results(dds, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
   }
   if (tissue=="blood" & timepoint!="" & is.null(cond1)){
     print("time given")
-    res <- results(dds, independentFiltering = FALSE, contrast=c("time",timepoint,"0"))
+    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
   }
   if (!is.null(cond1) & !is.null(cond2)){
     print("time and condition merged")
@@ -591,24 +593,56 @@ heatmap_DE <- function(sig, rld, org, tissue, type, title, timepoint){
                 scale="row",
                 cluster_rows=TRUE,
                 cluster_cols =FALSE, 
-                #show_rownames=FALSE,
+                show_rownames=FALSE,
                 #show_colnames=FALSE,
                 annotation_col=df,
                 annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
                 #annotation_legend = FALSE,
-                #annotation_names_col = FALSE,
+                annotation_names_col = FALSE,
                 #annotation_col=c("DSS","Control"),
                 key.title = "Row-wise Z-score",
                 #breaks = breaksList,
                 border_color = "NA",
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
-                cellwidth=20,
+                #cellwidth=20,
                 main=paste(title,",n=",n,sep=""))
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type, "_", timepoint, ".pdf", sep=""))
   #,width=9,height=7
   clust <- cbind(mat, cluster = cutree(x$tree_row, k = 5))
   return(clust)
 }
+
+heatmap_DE_rownames <- function(sig, rld, org, tissue, type, title, timepoint){
+  rows <- match(sig$id, row.names(rld))
+  mat <- assay(rld)[rows,]
+  n=dim(mat)[[1]]
+  df <- as.data.frame(colData(rld))
+  df = df[-c(2:7)]
+  #breaksList = seq(-2, 2, by = 0.25)
+  annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
+  x <- pheatmap(mat, 
+                scale="row",
+                cluster_rows=TRUE,
+                cluster_cols =FALSE, 
+                #show_rownames=FALSE,
+                #show_colnames=FALSE,
+                annotation_col=df,
+                annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
+                #annotation_legend = FALSE,
+                annotation_names_col = FALSE,
+                #annotation_col=c("DSS","Control"),
+                key.title = "Row-wise Z-score",
+                #breaks = breaksList,
+                border_color = "NA",
+                #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
+                #cellwidth=20,
+                main=paste(title,",n=",n,sep=""))
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type, "_", timepoint, ".pdf", sep=""))
+  #,width=9,height=7
+  clust <- cbind(mat, cluster = cutree(x$tree_row, k = 5))
+  return(clust)
+}
+
 
 heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
   rows <- match(sig$id, row.names(rld))
