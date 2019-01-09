@@ -27,7 +27,7 @@ data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_15461
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
 colon_samples=rownames(coldata[coldata$tissue=="colon",]) 
-ddsm <- get_deseq(cts2, coldata, colon_samples, 1, 0)
+ddsm <- get_deseq(cts, coldata, colon_samples, 1, 0)
 #vsd <- varianceStabilizingTransformation(ddsm, blind=TRUE)
 rld <- rlog(ddsm, blind=TRUE)
 meanSdPlot(assay(rld))
@@ -87,16 +87,18 @@ basic_plots(ddsp, rld, "pig", "colon","small")
 respcs<-NULL
 respcs <- as.data.frame(get_results(ddsp, "pig", "colon", "small", 1, ph_orth, pm_orth, p_biotypes,p_seq, "",NULL,NULL))
 ddspcs<-ddsp
-res<-respcs
-sig<-return_sig(respcs, NULL, NULL, 0, 0.05, 1, miRNAs)
+respcscorr <- get_results_corrected_pval(ddsp, "pig", "colon", "small", 1, ph_orth, pm_orth, 
+                                          p_biotypes, p_seq,"",NULL,NULL)
+sig<-return_sig(respcscorr, NULL, NULL, 0, 0.05, 1, miRNAs)
 heatmap_DE(sig,rld,"pig","colon","small","miRNAs","")
-hist(respcs$pvalue,breaks = 0:20/20)
+hist(respcscorr$pvalue,breaks = 0:20/20)
 
 # Pig blood all samples (combine timepoint and condition) 
 data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546252867.csv", "data/config_pig.txt", 30 , p_selected)
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
 blood_samples=rownames(coldata[coldata$tissue=="blood" & coldata$subject!="P17" & coldata$subject!="P15",])
+#blood_samples=rownames(coldata[coldata$tissue=="blood" & coldata$subject!="P17" ,])
 ddsp <- get_deseq_time_cond_merged_plus_batch(cts, coldata, blood_samples, 1, 0, "day0_DSS")
 rld <- rlog(ddsp, blind=TRUE)
 meanSdPlot(assay(rld))
@@ -107,21 +109,14 @@ respbs4 <- as.data.frame(get_results(ddsp, "pig", "blood", "small", 1, ph_orth, 
 #respbs2 <- as.data.frame(get_results(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
  #                                   p_biotypes, p_seq,"","day2_DSS","day0_DSS"))
 # P value correction
-respbs4_corr <- get_results(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
+respbs4corr <- get_results_corrected_pval(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
                                    p_biotypes, p_seq,"","day4_DSS","day0_DSS")
-DESeq2Res<-respbs4_corr
-DESeq2Res <- DESeq2Res[, -which(names(DESeq2Res) == "padj")]
-FDR.DESeq2Res <- fdrtool(DESeq2Res$stat, statistic= "normal", plot = F)
-FDR.DESeq2Res$param[1, "sd"]
-DESeq2Res[,"padj"]  <- p.adjust(FDR.DESeq2Res$pval, method = "BH")
-DESeq2Res[,"pvalue"]  <- FDR.DESeq2Res$pval
-hist(FDR.DESeq2Res$pval,breaks = 0:20/20)
-hist(DESeq2Res$pval,breaks = 0:20/20)
-respbs4_corr<- as.data.frame(DESeq2Res)
+respbs2corr <- get_results_corrected_pval(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
+                                          p_biotypes, p_seq,"","day2_DSS","day0_DSS")
 
-sig<-return_sig(respbs4_corr,NULL,  NULL, 0, 0.05,1, miRNAs)
+sig<-return_sig(respbs4corr,NULL,NULL, 0, 0.05,1, miRNAs)
 heatmap_DE(sig,rld,"pig","blood","small","miRNAs","t4")
-hist(respbs$pvalue,breaks = 0:20/20)
+hist(respbs2corr$pvalue,breaks = 0:20/20)
 
 
 

@@ -334,7 +334,55 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", bio
     if (!is.null(mir_seq)){
       resOrdered <- as.data.frame(merge(resOrdered, mir_seq, by.x='id', by.y='id', all.x=TRUE))
     }
-    write.table(resOrdered[c(1,2,3,7,8)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    write.table(resOrdered[c(1,2,3,6,7,8,10)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+  }
+  else if (startsWith(type, "total")){
+    resOrdered$id <- rownames(resOrdered)
+    resOrdered$id <- gsub("\\..*","",resOrdered$id)
+    resOrdered <- as.data.frame(merge(resOrdered, orth1, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
+    resOrdered <- as.data.frame(merge(resOrdered, orth2, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
+    write.table(resOrdered[c(1,2,3,6,7,8,9,10,11)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    resOrdered <- merge(resOrdered, biotypes, by.x='id',by.y='id', all.x=TRUE)
+}
+  #resOrdered_uc_co<-resOrdered_uc_co[resOrdered_uc_co$padj < thr,]
+  resSig <- subset(resOrdered, padj <= thr)
+  return(resSig)
+}
+
+get_results_corrected_pval <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, mir_seq=NULL, timepoint, cond1, cond2){
+  if (timepoint=="" & is.null(cond1)){
+    print("no timepoint")
+    res <- results(dds, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
+  }
+  if (tissue=="blood" & timepoint!="" & is.null(cond1)){
+    print("time given")
+    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
+  }
+  if (!is.null(cond1) & !is.null(cond2)){
+    print("time and condition merged")
+    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("timecond",cond1,cond2))
+  }
+  
+  DESeq2Res<-res
+  #DESeq2Res <- DESeq2Res[, -which(names(DESeq2Res) == "padj")]
+  FDR.DESeq2Res <- fdrtool(DESeq2Res$stat, statistic= "normal", plot = F)
+  FDR.DESeq2Res$param[1, "sd"]
+  DESeq2Res[,"pvalue"]  <- FDR.DESeq2Res$pval
+  DESeq2Res[,"padj"]  <- p.adjust(FDR.DESeq2Res$pval, method = "BH")
+  res<- as.data.frame(DESeq2Res)
+  
+  resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
+  names(resOrdered)[names(resOrdered) == "log2FoldChange"] = "logFC"
+  names(resOrdered)[names(resOrdered) == "baseMean"] = "avg.expr"
+  if (type == "small"){ 
+    resOrdered$id <- rownames(resOrdered)
+    resOrdered$partial_id <- gsub("^[^-]*-","",resOrdered$id)
+    resOrdered <- as.data.frame(resOrdered)
+    resOrdered$biotype <- "miRNA"
+    if (!is.null(mir_seq)){
+      resOrdered <- as.data.frame(merge(resOrdered, mir_seq, by.x='id', by.y='id', all.x=TRUE))
+    }
+    write.table(resOrdered[c(1,2,3,6,7,8,10)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
   }
   else if (startsWith(type, "total")){
     resOrdered$id <- rownames(resOrdered)
@@ -343,7 +391,7 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", bio
     resOrdered <- as.data.frame(merge(resOrdered, orth2, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
     write.table(resOrdered[c(1,2,3,7,8,9)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
     resOrdered <- merge(resOrdered, biotypes, by.x='id',by.y='id', all.x=TRUE)
-}
+  }
   #resOrdered_uc_co<-resOrdered_uc_co[resOrdered_uc_co$padj < thr,]
   resSig <- subset(resOrdered, padj <= thr)
   return(resSig)
@@ -791,5 +839,31 @@ filter_overlapping_mirs <- function(seqf){
   }
   return(selected_mirs)
 }  
+
+intersect_results <- function(res1,res2){
+  common_mcbs <- as.data.frame(merge(res1, res2, by.x='partial_id', by.y='partial_id'))
+  common_mcbs <- common_mcbs[,c(1,2:3,1,9:10,4:8,11:15),] 
+  names(common_mcbs)[c(1,4)]<-c("partial_id.x","partial_id.y")
+  common_mcbs_seq <- as.data.frame(merge(res1, res2, by.x='seq', by.y='seq'))
+  common_mcbs_seq <- common_mcbs_seq[,c(2,1,3,9,1,10,4:8,11:15),] 
+  names(common_mcbs_seq)[c(2,5)]<-c("seq.x","seq.y")
+  names(common_mcbs_seq)
+  names(common_mcbs)
+  common_mcbs=rbind(common_mcbs, common_mcbs_seq)
+  common_mcbs <- unique(common_mcbs)
+  mirs_same_id_seq_1 <- common_mcbs$partial_id.x
+  mirs_same_id_seq_2 <- common_mcbs$partial_id.y
+  res1=res1[!(res1$partial_id %in% mirs_same_id_seq_1),]
+  res2=res2[!(res2$partial_id %in% mirs_same_id_seq_2),]
+  common_mcbs_partial_seq <- as.data.frame(merge(res1, res2, by.x='partial_seq', by.y='partial_seq'))
+  common_mcbs_partial_seq <- common_mcbs_partial_seq[,c(2,3,1,9,10,1,4:8,11:15),] 
+  names(common_mcbs_partial_seq)[c(3,6)]<-c("partial_seq.x","partial_seq.y")
+  names(common_mcbs_partial_seq)
+  names(common_mcbs)
+  common_mcbs=rbind(common_mcbs, common_mcbs_partial_seq)
+  return(common_mcbs)
+}
+
+
 
 

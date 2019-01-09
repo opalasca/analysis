@@ -75,7 +75,7 @@ ddsmb <- ddsm
 boxplot(assay(rldb))
 sig<-return_sig(resmb, NULL, NULL, 0, 0.05, 0.1, protein_coding)
 heatmap_DE(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes","t8")
-sig<-return_sig(resmb, NULL, NULL, 0, 0.05, 0.1, lncRNAs)
+sig<-return_sig(resmb, NULL, NULL, 0, 1, 1, lncRNAs)
 heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs","t8")
 hist(resmb$pvalue,breaks = 0:20/20)
 
@@ -124,16 +124,13 @@ rldb <- rlog(ddsp, blind=TRUE);
 meanSdPlot(assay(vsd))
 basic_plots(ddsp, rldb, "pig", "blood", "total", TRUE)
 respb<-NULL
-respb <- as.data.frame(get_results(ddsp, "mouse", "blood", "total", 1, ph_orth, pm_orth, 
+respb <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, 
                                    p_biotypes, NULL,"","day4_DSS","day0_DSS"))
 sig<-return_sig(respb, NULL, NULL, 0, 0.05, 0.1, protein_coding)
 heatmap_DE(sig,rldb,"pig","blood","total_protein_coding","Protein coding genes","t4")
 sig<-return_sig(respb, NULL, NULL, 0, 0.05, 0.1, lncRNAs)
 heatmap_DE(sig,rldb,"pig","blood","total_lncRNA","LncRNAs","t4")
 hist(respb$pvalue,breaks = 0:20/20)
-
-
-
 
 
 # Pig blood DSS samples 
