@@ -310,18 +310,18 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   #ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
 }
 
-get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, mir_seq=NULL, timepoint, cond1, cond2){
+get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, idname, mir_seq=NULL, timepoint, cond1, cond2){
   if (timepoint=="" & is.null(cond1)){
     print("no timepoint")
-    res <- results(dds, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
+    res <- results(dds,cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
   }
   if (tissue=="blood" & timepoint!="" & is.null(cond1)){
     print("time given")
-    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
+    res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
   }
   if (!is.null(cond1) & !is.null(cond2)){
     print("time and condition merged")
-    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("timecond",cond1,cond2))
+    res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald", contrast=c("timecond",cond1,cond2))
   }
   resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
   names(resOrdered)[names(resOrdered) == "log2FoldChange"] = "logFC"
@@ -337,11 +337,15 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", bio
     write.table(resOrdered[c(1,2,3,6,7,8,10)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
   }
   else if (startsWith(type, "total")){
+    idname <- idname[,c(1,3)]
+    names(idname) <- c("id","Gene.Name")
+    idname <- unique(idname)
     resOrdered$id <- rownames(resOrdered)
     resOrdered$id <- gsub("\\..*","",resOrdered$id)
     resOrdered <- as.data.frame(merge(resOrdered, orth1, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
     resOrdered <- as.data.frame(merge(resOrdered, orth2, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
-    write.table(resOrdered[c(1,2,3,6,7,8,9,10,11)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    resOrdered <- as.data.frame(merge(resOrdered, idname, by.x='id', by.y='id', all.x=TRUE))
+    write.table(resOrdered[c(1,2,3,6,7,12,8,9,10,11)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
     resOrdered <- merge(resOrdered, biotypes, by.x='id',by.y='id', all.x=TRUE)
 }
   #resOrdered_uc_co<-resOrdered_uc_co[resOrdered_uc_co$padj < thr,]
@@ -352,15 +356,16 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", bio
 get_results_corrected_pval <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, mir_seq=NULL, timepoint, cond1, cond2){
   if (timepoint=="" & is.null(cond1)){
     print("no timepoint")
-    res <- results(dds, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
+    cooksCutoff=FALSE
+    res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
   }
   if (tissue=="blood" & timepoint!="" & is.null(cond1)){
     print("time given")
-    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
+    res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
   }
   if (!is.null(cond1) & !is.null(cond2)){
     print("time and condition merged")
-    res <- results(dds, independentFiltering = FALSE, test="Wald", contrast=c("timecond",cond1,cond2))
+    res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald", contrast=c("timecond",cond1,cond2))
   }
   
   DESeq2Res<-res
@@ -783,6 +788,31 @@ return_sig<-function(res1,res2,res3,lfc,pval,padj,biotypes){
   } 
   else if ( !is.null(res1) & !is.null(res2) & is.null(res3) ){
     sig <-merge(sig1, sig2, by.x='id', by.y='id',all=TRUE)
+  }
+  else if ( !is.null(res1) & !is.null(res2) & !is.null(res3) ){
+    print("here")
+    sigtmp <-merge(sig1, sig2, by.x='id', by.y='id', all.x=TRUE,all.y=TRUE)
+    sig <-merge(sigtmp, sig3, by.x='id', by.y='id',all.x=TRUE, all.y=TRUE)
+  }
+  return(sig)
+}
+
+return_sig_no_biotype<-function(res1,res2,res3,lfc,pval,padj){
+  if (!is.null(res1)){
+    sig1<-res1[abs(res1$logFC)>lfc & res1$pvalue<pval & res1$padj<padj ,]
+  }
+  if (!is.null(res2)){
+    sig2<-res2[abs(res2$logFC)>lfc & res2$pvalue<pval & res2$padj<padj ,]
+  }
+  if (!is.null(res3)){
+    sig3<-res3[abs(res3$logFC)>lfc & res3$pvalue<pval & res3$padj<padj,]
+  }
+  if ( !is.null(res1) & is.null(res2) & is.null(res3) ){
+    sig <- sig1
+  } 
+  else if ( !is.null(res1) & !is.null(res2) & is.null(res3) ){
+    sig <-merge(sig1, sig2, by.x='id', by.y='id',all=TRUE)
+    sig$logFC=max(sig$logFC.x,sig$logFC.y)
   }
   else if ( !is.null(res1) & !is.null(res2) & !is.null(res3) ){
     print("here")

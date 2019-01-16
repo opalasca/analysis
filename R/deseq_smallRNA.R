@@ -5,13 +5,11 @@ source("R/deseq_functions.R")
 
 m_new_mirna_file="data/new_miRNA_mus_musculus.csv"
 p_new_mirna_file="data/new_miRNA_sus_scrofa.csv"
-m_mirna_seq="data/mir_name_sequence_mus_musculus.csv"
-p_mirna_seq="data/mir_name_sequence_sus_scrofa.csv"
 
 m_new <- read.csv(m_new_mirna_file, header=TRUE, sep="\t")
 p_new <- read.csv(p_new_mirna_file, header=TRUE, sep="\t")
-m_seq <- read.csv(m_mirna_seq, header=FALSE, sep="\t")
-p_seq <- read.csv(p_mirna_seq, header=FALSE, sep="\t")
+m_seq <- read.csv("data/mir_name_sequence_mus_musculus.csv", header=FALSE, sep="\t")
+p_seq <- read.csv("data/mir_name_sequence_sus_scrofa.csv", header=FALSE, sep="\t")
 colnames(m_seq)=c("id","seq")
 colnames(p_seq)=c("id","seq")
 
@@ -31,14 +29,16 @@ ddsm <- get_deseq(cts, coldata, colon_samples, 1, 0)
 #vsd <- varianceStabilizingTransformation(ddsm, blind=TRUE)
 rld <- rlog(ddsm, blind=TRUE)
 meanSdPlot(assay(rld))
-basic_plots(ddsm, rld, "mouse", "colon","small")
+rld <- rld[,colnames]
+#basic_plots(ddsm, rld, "mouse", "colon","small")
 resmcs<-NULL
-resmcs <- as.data.frame(get_results(ddsm, "mouse", "colon", "small", 1, mh_orth, pm_orth, m_biotypes, m_seq, "", NULL, NULL))
+resmcs <- as.data.frame(get_results(ddsm, "mouse", "colon", "small", 1, mh_orth, pm_orth, m_biotypes,"", m_seq, "", NULL, NULL))
 ddsmcs<-ddsm
 hist(resmcs$pvalue)
 sig<-return_sig(resmcs, NULL, NULL, 0, 0.05, 1, miRNAs)
 clust<-heatmap_DE(sig,rld,"mouse","colon","small","miRNAs","")
-
+rlog_mouse_colon_small <- assay(rld)
+df1 <- rlog_mouse_colon_small
 
 
 # Mouse blood, all samples (timepoint and condition combined and all controls considered as DSS day 0
@@ -48,18 +48,21 @@ cts<-data[[1]]; coldata<-data[[2]]
 blood_samples=rownames(coldata[coldata$tissue=="blood",])
 ddsm <- get_deseq_time_cond_merged(cts, coldata, blood_samples, 1, 0,"day0_DSS")
 rld <- rlog(ddsm, blind=TRUE)
+filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
+#rld <- rld[,colnames(rld) %in% filtered_samples]
 meanSdPlot(assay(rld))
-basic_plots(ddsm, rld, "mouse", "blood", "small")
+#basic_plots(ddsm, rld, "mouse", "blood", "small")
 resmbs<-NULL
 resmbs <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth, pm_orth, 
-                                    m_biotypes, m_seq,"","day8_DSS","day0_DSS"))
-sig<-return_sig(resmbs, NULL, NULL, 0, 0.05, 1, miRNAs)
-heatmap_DE(sig,rld,"mouse","blood","small","miRNAs","t8")
+                                    m_biotypes,"", m_seq,"","day8_DSS","day0_DSS"))
+resmbs2 <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth, pm_orth, 
+                                    m_biotypes,"", m_seq,"","day2_DSS","day0_DSS"))
+sig<-return_sig(resmbs, resmbs2, NULL, 0, 0.05, 1, miRNAs)
+heatmap_DE_rownames(sig,rld,"mouse","blood","small","miRNAs","t8")
 hist(resmbs$pvalue,breaks = 0:20/20)
 boxplot(assay(rld))
-
 clust<-heatmap_DE_ts(sig,rld,"mouse","blood","small","miRNAs","t8")
-hist(resmbs2$pvalue)
+#hist(resmbs2$pvalue)
 clust<-as.data.frame(clust)
 subclust <- clust[clust$cluster=="5",]
 for (i in rownames(subclust)){
@@ -68,6 +71,7 @@ for (i in rownames(subclust)){
 #print(rownames(clust[clust$cluster=="5",]))
 kable(rownames(clust[clust$cluster=="5",]))
 #plotCounts(ddsmbs, gene="mmu-mir-345-5p", intgroup="condition", returnData=TRUE)
+rlog_mouse_blood_small <- assay(rld)
 
 
 
@@ -85,7 +89,7 @@ meanSdPlot(assay(rld))
 basic_plots(ddsp, rld, "pig", "colon","small")
 #resOrdered_uc_co <- get_results(dds, "pig", "colon", "small", 0.1)
 respcs<-NULL
-respcs <- as.data.frame(get_results(ddsp, "pig", "colon", "small", 1, ph_orth, pm_orth, p_biotypes,p_seq, "",NULL,NULL))
+respcs <- as.data.frame(get_results(ddsp, "pig", "colon", "small", 1, ph_orth, pm_orth, p_biotypes,"",p_seq, "",NULL,NULL))
 ddspcs<-ddsp
 respcscorr <- get_results_corrected_pval(ddsp, "pig", "colon", "small", 1, ph_orth, pm_orth, 
                                           p_biotypes, p_seq,"",NULL,NULL)
@@ -105,14 +109,14 @@ meanSdPlot(assay(rld))
 basic_plots(ddsp, rld, "pig", "blood", "small")
 respbs4<-NULL
 respbs4 <- as.data.frame(get_results(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
-                                    p_biotypes, p_seq,"","day4_DSS","day0_DSS"))
+                                    p_biotypes,"", p_seq,"","day4_DSS","day0_DSS"))
 #respbs2 <- as.data.frame(get_results(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
  #                                   p_biotypes, p_seq,"","day2_DSS","day0_DSS"))
 # P value correction
 respbs4corr <- get_results_corrected_pval(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
-                                   p_biotypes, p_seq,"","day4_DSS","day0_DSS")
+                                   p_biotypes,"", p_seq,"","day4_DSS","day0_DSS")
 respbs2corr <- get_results_corrected_pval(ddsp, "pig", "blood", "small", 1, ph_orth, pm_orth, 
-                                          p_biotypes, p_seq,"","day2_DSS","day0_DSS")
+                                          p_biotypes,"", p_seq,"","day2_DSS","day0_DSS")
 
 sig<-return_sig(respbs4corr,NULL,NULL, 0, 0.05,1, miRNAs)
 heatmap_DE(sig,rld,"pig","blood","small","miRNAs","t4")

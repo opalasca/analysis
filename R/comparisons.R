@@ -84,7 +84,15 @@ mp<-get_stats(common_mcbt,  "mouse", "human", pthr, pthr, thr, thr, 0)
 mp[[1]]
 cons_mcbt<-mp[[2]]
 
-
+#Mouse colon vs mouse blood small
+res2<-resmcs
+res3<-resmbs
+common_mcbt <- data.frame()
+common_mcbt <- as.data.frame(merge(res2, res3, by.x='partial_id', by.y='partial_id'))
+pthr=0.05; thr=0
+mp<-get_stats_pval(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
+kable(mp[[1]])
+cons_mcbt<-mp[[2]]
 
 # LogFC comparisons between mouse and pig 
 

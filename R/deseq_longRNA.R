@@ -25,6 +25,10 @@ lncRNAs=c("lincRNA","antisense", "3prime_overlapping_ncRNA","bidirectional_promo
           "processed_transcript", "sense_intronic","sense_overlapping")
 protein_coding=c("protein_coding")
 
+m_names <- read.csv("data/mouse_gene_transcript_name.tsv", header=TRUE, sep="\t")
+p_names <- read.csv("data/pig_gene_transcript_name.tsv", header=TRUE, sep="\t")
+
+
 data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
@@ -37,21 +41,21 @@ ddsm<-NULL
 ddsm <- get_deseq(cts, coldata, colon_samples, 1, 0)
 vsd <- vst(ddsm, blind=FALSE) ##
 rldc <- rlog(ddsm, blind=TRUE)
-basic_plots(ddsm, rldc, "mouse", "colon","total",FALSE)
+#basic_plots(ddsm, rldc, "mouse", "colon","total",FALSE)
 resmc<-NULL
-resmc <- as.data.frame(get_results(ddsm, "mouse", "colon", "total", 1, mh_orth, mp_orth, m_biotypes, NULL,"",NULL,NULL))
+resmc <- as.data.frame(get_results(ddsm, "mouse", "colon", "total", 1, mh_orth, mp_orth, m_biotypes, m_names, NULL,"",NULL,NULL))
 ddsmc<-ddsm
 res<-resmc
-
 lfcthr=1; pthr=0.1
 siglncc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype %in% lncRNAs,]
 sigpcc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype=="protein_coding",]
-heatmap_DE(sigpcc,rldc,"mouse","colon","total_protein_coding","Protein coding genes")
-heatmap_DE(siglncc,rldc,"mouse","colon","total_lncRNA","LncRNAs")
+heatmap_DE(sigpcc,rldc,"mouse","colon","total_protein_coding","Protein coding genes","")
+heatmap_DE(siglncc,rldc,"mouse","colon","total_lncRNA","LncRNAs","")
 dim(sigpcc[sigpcc$logFC>1,])
 dim(sigpcc[sigpcc$logFC<1,])
 dim(siglncc[siglncc$logFC<1,])
 dim(siglncc[siglncc$logFC>1,])
+rlog_mouse_colon_total <- assay(rldc)
 
 
 
@@ -66,19 +70,23 @@ blood_samples=rownames(coldata[coldata$tissue=="blood",])
 ddsm <- get_deseq_time_cond_merged(cts, coldata, blood_samples, 1, 0,"day0_DSS")
 vsd <- vst(ddsm, blind=FALSE) ##rld <- rlog(dds, blind=FALSE); ntd <- normTransform(dds)
 rldb <- rlog(ddsm, blind=TRUE)
-meanSdPlot(assay(vsd))
-basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
+filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
+rldb <- rldb[,colnames(rldb) %in% filtered_samples]
+#meanSdPlot(assay(vsd))
+#basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
 resmb<-NULL
 resmb <- as.data.frame(get_results(ddsm, "mouse", "blood", "total", 1, mh_orth, mp_orth, 
-                                   m_biotypes, NULL,"","day8_DSS","day0_DSS"))
+                                   m_biotypes, m_names, NULL,"","day8_DSS","day0_DSS"))
+resmb2 <- as.data.frame(get_results(ddsm, "mouse", "blood", "total", 1, mh_orth, mp_orth, 
+                                   m_biotypes, m_names, NULL,"","day2_DSS","day0_DSS"))
 ddsmb <- ddsm
 boxplot(assay(rldb))
-sig<-return_sig(resmb, NULL, NULL, 0, 0.05, 0.1, protein_coding)
+sig<-return_sig(resmb, resmb2, NULL, 0, 0.05, 0.1, protein_coding)
 heatmap_DE(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes","t8")
-sig<-return_sig(resmb, NULL, NULL, 0, 1, 1, lncRNAs)
+sig<-return_sig(resmb, resmb2, NULL, 0, 0.05, 0.1, lncRNAs)
 heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs","t8")
 hist(resmb$pvalue,breaks = 0:20/20)
-
+rlog_mouse_blood_total <- assay(rldb)
 
 
 
@@ -99,7 +107,7 @@ rldc <- rlog(ddsp, blind=TRUE);
 meanSdPlot(assay(vsd))
 basic_plots(ddsp, rldc, "pig", "colon","total",FALSE)
 respc<-NULL
-respc <- as.data.frame(get_results(ddsp, "pig", "colon", "total", 1, ph_orth, pm_orth, p_biotypes,NULL,"",NULL,NULL))
+respc <- as.data.frame(get_results(ddsp, "pig", "colon", "total", 1, ph_orth, pm_orth, p_biotypes, p_names, NULL,"",NULL,NULL))
 ddspc<-ddsp
 boxplot(assay(rldc))
 sig<-return_sig(respc, NULL, NULL, 0, 0.05, 0.1, protein_coding)
@@ -125,7 +133,7 @@ meanSdPlot(assay(vsd))
 basic_plots(ddsp, rldb, "pig", "blood", "total", TRUE)
 respb<-NULL
 respb <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, 
-                                   p_biotypes, NULL,"","day4_DSS","day0_DSS"))
+                                   p_biotypes,p_names, NULL,"","day4_DSS","day0_DSS"))
 sig<-return_sig(respb, NULL, NULL, 0, 0.05, 0.1, protein_coding)
 heatmap_DE(sig,rldb,"pig","blood","total_protein_coding","Protein coding genes","t4")
 sig<-return_sig(respb, NULL, NULL, 0, 0.05, 0.1, lncRNAs)
