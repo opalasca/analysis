@@ -108,8 +108,6 @@ mp[[1]]
 cons_mpc<-mp[[2]]
 
 
-
-
 # Human vs mouse vs pig 
 res1<-AI_vs_C
 res2<-resmc[complete.cases(resmc),]
@@ -123,17 +121,17 @@ common_mp <- data.frame()
 common_hm <- as.data.frame(merge(res1, res2, by.x='Gene.Symbol', by.y='Human.gene.name'))
 common_hp <- as.data.frame(merge(res1, res3, by.x='Gene.Symbol', by.y='Human.gene.name'))
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
-pthr=0.1; thr=1
+pthr=0.1; thr=0
 hm<-get_stats(common_hm, "human", "mouse", pthr, pthr, thr, thr,0)
 hp<-get_stats(common_hp, "human", "pig", pthr, 0.1, thr, thr, 0)
-mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, 1, 0)
+mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, thr, 0)
 
 cons_hm<-hm[[2]]
 cons_hp<-hp[[2]]
 cons_mp<-mp[[2]]
-hm[[1]]
-hp[[1]]
-mp[[1]]
+kable(hm[[1]])
+kable(hp[[1]])
+kable(mp[[1]])
 
 
 
@@ -143,7 +141,7 @@ res3<-respb[complete.cases(respb),]
 #res3<-respb5[complete.cases(respb5),]
 common_mp <- data.frame()
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
-pthr=0.1; thr=1
+pthr=0.1; thr=0.5
 mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, thr, 0)
 kable(mp[[1]])
 cons_mpb<-mp[[2]]
@@ -228,7 +226,6 @@ kable(mp[[3]][c(1,4,9,14)])
 overlap1<-merge(cons_mpbs,cons_mhbs,by="partial_id.x")
 overlap2<-merge(cons_mpbs,cons_phbs, by.x="partial_id.y", by.y="partial_id.x")
 overlap3<-merge(cons_mhbs,cons_phbs, by.x="partial_id.y", by.y="partial_id.y")
-
 
 pthr=0.1; thr=0
 #Mouse vs pig colon small

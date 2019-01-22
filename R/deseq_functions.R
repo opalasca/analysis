@@ -702,20 +702,24 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
   mat <- assay(rld)[rows,]
   n=dim(mat)[[1]]
   df <- as.data.frame(colData(rld))
-  df = df[-c(1,2,4,5,6)]
+  df = df[-c(2,4,5,6,7)]
   breaksList = seq(-2, 2, by = 0.25)
   if (org=="mouse"){
-    time_colors = list(time=c("0"="grey80", "2"="grey50", "8"="grey30"))
+    #time_colors = list(time=c("0"="grey80", "2"="grey50", "8"="grey30"),condition=c(DSS="grey30", Control="grey70"))
+    time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "8"="#6BAED6"),condition=c(DSS="grey30", Control="grey70"))
   }
   else{
-    time_colors = list(time=c("0"="grey80", "2"="grey60", "4"="grey40", "5"="grey25"))
-  }
+    #time_colors = list(time=c("0"="grey80", "2"="grey60", "4"="grey40", "5"="grey25"),condition=c(DSS="grey30", Control="grey70"))
+    #time_colors = list(condition=c(DSS="grey30", Control="grey70"))
+    #time_colors = list(time=c("0"="azure", "2"="cadetblue1", "4"="cornflowerblue", "5"="deepskyblue4"),condition=c(DSS="grey30", Control="grey70"))
+    time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "4"="#6BAED6", "5"="#2171B5"),condition=c(DSS="grey30", Control="grey70"))
+    }
   annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
   x <- pheatmap(mat, 
                 scale="row",
                 cluster_rows=TRUE,
                 cluster_cols=FALSE, 
-                #show_rownames=FALSE,
+                show_rownames=FALSE,
                 #show_colnames=FALSE,
                 annotation_col=df,
                 #annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
@@ -727,7 +731,7 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
                 #breaks = breaksList,
                 border_color = "NA",
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
-                cellwidth=20,
+                #cellwidth=20,
                 main=paste(title,",n=",n,sep="") )
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_TS_", org, "_",tissue,"_",type,".pdf", sep=""))
   #,width=9,height=7
@@ -894,6 +898,29 @@ intersect_results <- function(res1,res2){
   return(common_mcbs)
 }
 
+get_mean<-function(rld,coldata,org,tissue,type){
+  #org="mouse";tissue="colon";rld<-assay(rldc);type="total"  
+  m<-rld[,0]
+  #m$id=rownames(m)
+  if (tissue=="colon"){
+    c1<-rownames(coldata[coldata$tissue=="colon" & coldata$condition=="DSS",])
+    c2<-rownames(coldata[coldata$tissue=="colon" & coldata$condition=="Control",])
+    m<-cbind(m, id=rownames(m), DSS=rowMeans(rld[,c1]), Control=rowMeans(rld[,c2]), Diff=rowMeans(rld[,c1])-rowMeans(rld[,c2]))
+  }
+  if (tissue=="blood" & org=="mouse"){
+    c1<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="0",])
+    c2<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="2",])
+    c3<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="8",])
+    m<-cbind(m, id=rownames(m),DSS_day0=rowMeans(rld[,c1]), DSS_day2=rowMeans(rld[,c2]), DSS_day8=rowMeans(rld[,c3]), Diff=rowMeans(rld[,c3])-rowMeans(rld[,c1]))
+  }
+  m<-as.matrix(m)
+  #m[,c("Diff")]<-as.numeric(levels(m[,c("Diff")]))[m[,c("Diff")]]
+  m[,c("Diff")]<-as.numeric(unlist(m[,c("Diff")]))
+  m<-as.data.frame(m)
+  m$Diff<-as.numeric(levels(m$Diff))[m$Diff]
+  write.table(m,file=paste("results/mean_rlog_", org, "_", tissue, "_",type,".tsv",sep=""), sep="\t", row.names=FALSE, quote = F )
+  return(m)
+}
 
 
 

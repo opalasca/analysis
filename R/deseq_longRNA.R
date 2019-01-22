@@ -28,10 +28,14 @@ protein_coding=c("protein_coding")
 m_names <- read.csv("data/mouse_gene_transcript_name.tsv", header=TRUE, sep="\t")
 p_names <- read.csv("data/pig_gene_transcript_name.tsv", header=TRUE, sep="\t")
 
+tpmm<-get_data("data/mouse_strtie_quant_tpm_reseq.csv", "data/config_mouse.txt")
+tpm_mouse<-as.data.frame(log(tpmm[[1]]+1))
+hist(tpm_mouse$MC1)
 
 data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
+coldata<-coldata[order(coldata$condition,coldata$time),]
 dim(cts)
 cts<-cts[rownames(cts) %in% mouse_genes_to_keep$id,]
 dim(cts)
@@ -56,22 +60,26 @@ dim(sigpcc[sigpcc$logFC<1,])
 dim(siglncc[siglncc$logFC<1,])
 dim(siglncc[siglncc$logFC>1,])
 rlog_mouse_colon_total <- assay(rldc)
-
-
+tpm_mouse_colon<-tpm_mouse[rownames(tpm_mouse) %in% rownames(rlog_mouse_colon_total),]
+meanrldc<-get_mean(rlog_mouse_colon_total,coldata,"mouse", "colon", "total")
+meantpmc<-get_mean(tpm_mouse_colon, coldata, "mouse", "colon", "total")
+hist(meantpmc$DSS)
 
 # Mouse blood all samples #
 ###########################
 data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse.txt")
 #data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
 cts<-data[[1]]; coldata<-data[[2]]
+coldata<-coldata[order(coldata$condition,coldata$time),]
 cts<-cts[rownames(cts) %in% mouse_genes_to_keep$id,]
 blood_samples=rownames(coldata[coldata$tissue=="blood",])
 #ddsm <- get_deseq(cts, coldata, blood_samples, 1, 0)
 ddsm <- get_deseq_time_cond_merged(cts, coldata, blood_samples, 1, 0,"day0_DSS")
 vsd <- vst(ddsm, blind=FALSE) ##rld <- rlog(dds, blind=FALSE); ntd <- normTransform(dds)
 rldb <- rlog(ddsm, blind=TRUE)
+#filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time != "2",])
 filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
-rldb <- rldb[,colnames(rldb) %in% filtered_samples]
+#rldb <- rldb[,colnames(rldb) %in% filtered_samples]
 #meanSdPlot(assay(vsd))
 #basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
 resmb<-NULL
@@ -82,12 +90,15 @@ resmb2 <- as.data.frame(get_results(ddsm, "mouse", "blood", "total", 1, mh_orth,
 ddsmb <- ddsm
 boxplot(assay(rldb))
 sig<-return_sig(resmb, resmb2, NULL, 0, 0.05, 0.1, protein_coding)
-heatmap_DE(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes","t8")
+heatmap_DE_ts(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes")
 sig<-return_sig(resmb, resmb2, NULL, 0, 0.05, 0.1, lncRNAs)
-heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs","t8")
+heatmap_DE_ts(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs")
 hist(resmb$pvalue,breaks = 0:20/20)
 rlog_mouse_blood_total <- assay(rldb)
-
+tpm_mouse_blood<-tpm_mouse[rownames(tpm_mouse) %in% rownames(rlog_mouse_blood_total),]
+meanrldb<-get_mean(rlog_mouse_blood_total,coldata,"mouse", "blood", "total")
+meantpmb<-get_mean(tpm_mouse_blood,coldata,"mouse", "blood", "total")
+hist(meantpmb$DSS_day8)
 
 
 # Pig colon #
@@ -95,6 +106,7 @@ rlog_mouse_blood_total <- assay(rldb)
 data<-get_data("data/gene_count_matrix_pig_annot.csv", "data/config_pig.txt")
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
+coldata<-coldata[order(coldata$condition,coldata$time),]
 dim(cts)
 cts<-cts[rownames(cts) %in% pig_genes_to_keep$id,]
 dim(cts)
@@ -105,7 +117,7 @@ ddsp <- get_deseq_batch(cts, coldata, colon_samples, 1, 0)
 vsd <- vst(ddsp, blind=FALSE) 
 rldc <- rlog(ddsp, blind=TRUE); 
 meanSdPlot(assay(vsd))
-basic_plots(ddsp, rldc, "pig", "colon","total",FALSE)
+#basic_plots(ddsp, rldc, "pig", "colon","total",FALSE)
 respc<-NULL
 respc <- as.data.frame(get_results(ddsp, "pig", "colon", "total", 1, ph_orth, pm_orth, p_biotypes, p_names, NULL,"",NULL,NULL))
 ddspc<-ddsp
@@ -123,6 +135,7 @@ hist(respc$pvalue)
 data<-get_data("data/gene_count_matrix_pig_annot.csv", "data/config_pig.txt")
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
+coldata<-coldata[order(coldata$condition,coldata$time),]
 cts<-cts[rownames(cts) %in% pig_genes_to_keep$id,]
 blood_samples=rownames(coldata[coldata$tissue=="blood",]) 
 ddsp <- NULL
@@ -130,15 +143,21 @@ ddsp <- get_deseq_time_cond_merged_plus_batch(cts, coldata, blood_samples, 1,0,"
 vsd <- vst(ddsp, blind=FALSE) 
 rldb <- rlog(ddsp, blind=TRUE); 
 meanSdPlot(assay(vsd))
-basic_plots(ddsp, rldb, "pig", "blood", "total", TRUE)
+#basic_plots(ddsp, rldb, "pig", "blood", "total", TRUE)
 respb<-NULL
 respb <- as.data.frame(get_results(ddsp, "pig", "blood", "total", 1, ph_orth, pm_orth, 
                                    p_biotypes,p_names, NULL,"","day4_DSS","day0_DSS"))
 sig<-return_sig(respb, NULL, NULL, 0, 0.05, 0.1, protein_coding)
-heatmap_DE(sig,rldb,"pig","blood","total_protein_coding","Protein coding genes","t4")
+heatmap_DE_ts(sig,rldb,"pig","blood","total_protein_coding","Protein coding genes")
 sig<-return_sig(respb, NULL, NULL, 0, 0.05, 0.1, lncRNAs)
 heatmap_DE(sig,rldb,"pig","blood","total_lncRNA","LncRNAs","t4")
 hist(respb$pvalue,breaks = 0:20/20)
+
+
+
+
+
+
 
 
 # Pig blood DSS samples 
