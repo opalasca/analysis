@@ -31,6 +31,10 @@ p_names <- read.csv("data/pig_gene_transcript_name.tsv", header=TRUE, sep="\t")
 tpmm<-get_data("data/mouse_strtie_quant_tpm_reseq.csv", "data/config_mouse.txt")
 tpm_mouse<-as.data.frame(log(tpmm[[1]]+1))
 hist(tpm_mouse$MC1)
+tpmp<-get_data("data/pig_strtie_quant_tpm.csv", "data/config_pig.txt")
+tpm_pig<-as.data.frame(log(tpmp[[1]]+1))
+hist(tpm_pig$PC20)
+
 
 data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
 cts<-NULL; coldata<-NULL
@@ -50,11 +54,13 @@ resmc<-NULL
 resmc <- as.data.frame(get_results(ddsm, "mouse", "colon", "total", 1, mh_orth, mp_orth, m_biotypes, m_names, NULL,"",NULL,NULL))
 ddsmc<-ddsm
 res<-resmc
-lfcthr=1; pthr=0.1
-siglncc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype %in% lncRNAs,]
-sigpcc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype=="protein_coding",]
-heatmap_DE(sigpcc,rldc,"mouse","colon","total_protein_coding","Protein coding genes","")
-heatmap_DE(siglncc,rldc,"mouse","colon","total_lncRNA","LncRNAs","")
+#lfcthr=1; pthr=0.1
+#siglncc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype %in% lncRNAs,]
+#sigpcc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype=="protein_coding",]
+sig<-return_sig(resmc, NULL, NULL, 0, 0.05, 0.1, protein_coding)
+#heatmap_DE(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes")
+heatmap_DE(sig,rldc,"mouse","colon","total_protein_coding","Protein coding genes","")
+#heatmap_DE(siglncc,rldc,"mouse","colon","total_lncRNA","LncRNAs","")
 dim(sigpcc[sigpcc$logFC>1,])
 dim(sigpcc[sigpcc$logFC<1,])
 dim(siglncc[siglncc$logFC<1,])
@@ -98,7 +104,17 @@ rlog_mouse_blood_total <- assay(rldb)
 tpm_mouse_blood<-tpm_mouse[rownames(tpm_mouse) %in% rownames(rlog_mouse_blood_total),]
 meanrldb<-get_mean(rlog_mouse_blood_total,coldata,"mouse", "blood", "total")
 meantpmb<-get_mean(tpm_mouse_blood,coldata,"mouse", "blood", "total")
-hist(meantpmb$DSS_day8)
+#hist(meantpmb$DSS_day8)
+clust<-heatmap_DE_ts(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes")
+#hist(resmbs2$pvalue)
+clust<-as.data.frame(clust)
+clust$id <- rownames(clust)
+
+subclust <- clust[clust$cluster=="5",]
+subclust$id <- rownames(subclust)
+for (i in rownames(subclust)){
+  print(i)
+}
 
 
 # Pig colon #
@@ -130,6 +146,12 @@ dim(sigpcc[sigpcc$logFC<1,])
 dim(siglncc[siglncc$logFC>1,])
 dim(siglncc[siglncc$logFC<1,])
 hist(respc$pvalue)
+rlog_pig_colon_total <- assay(rldc)
+tpm_pig_colon<-tpm_pig[rownames(tpm_pig) %in% rownames(rlog_pig_colon_total),]
+meanrldcp<-get_mean(rlog_pig_colon_total, coldata, "pig", "colon", "total")
+meantpmcp<-get_mean(tpm_pig_colon, coldata, "pig", "colon", "total")
+hist(meantpmcp$DSS)
+
 
 #Pig blood all samples 
 data<-get_data("data/gene_count_matrix_pig_annot.csv", "data/config_pig.txt")
@@ -152,8 +174,15 @@ heatmap_DE_ts(sig,rldb,"pig","blood","total_protein_coding","Protein coding gene
 sig<-return_sig(respb, NULL, NULL, 0, 0.05, 0.1, lncRNAs)
 heatmap_DE(sig,rldb,"pig","blood","total_lncRNA","LncRNAs","t4")
 hist(respb$pvalue,breaks = 0:20/20)
-
-
+rlog_pig_blood_total <- assay(rldb)
+tpm_pig_blood<-tpm_pig[rownames(tpm_pig) %in% rownames(rlog_pig_blood_total),]
+meanrldbp<-get_mean(rlog_pig_blood_total, coldata, "pig", "blood", "total")
+meantpmbp<-get_mean(tpm_pig_blood, coldata, "pig", "blood", "total")
+m<-meantpmbp
+m$DSS_day2<-as.numeric(levels(m$DSS_day2))[m$DSS_day2]
+m$DSS_day0<-as.numeric(levels(m$DSS_day0))[m$DSS_day0]
+m$DSS_day4<-as.numeric(levels(m$DSS_day4))[m$DSS_day4]
+hist(m$DSS_day0)
 
 
 

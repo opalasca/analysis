@@ -109,19 +109,22 @@ cons_mpc<-mp[[2]]
 
 
 # Human vs mouse vs pig 
+IPA<-read.csv("data/IBD_IPA.txt", header=TRUE, sep="\t")
+
 res1<-AI_vs_C
 res2<-resmc[complete.cases(resmc),]
 res3<-respc[complete.cases(respc),]
-#res1<-as.data.frame(merge(AI_vs_C, IPA, by.x='Gene.Symbol', by.y='Molecule.Name'))
-#res2<-as.data.frame(merge(res2, IPA, by.x='Human.gene.name', by.y='Molecule.Name'))
-#res3<-as.data.frame(merge(res3, IPA, by.x='Human.gene.name', by.y='Molecule.Name'))
+
+res1<-as.data.frame(merge(AI_vs_C, IPA, by.x='Gene.Symbol', by.y='Molecule.Name'))
+res2<-as.data.frame(merge(res2, IPA, by.x='Human.gene.name', by.y='Molecule.Name'))
+res3<-as.data.frame(merge(res3, IPA, by.x='Human.gene.name', by.y='Molecule.Name'))
 common_hm <- data.frame()
 common_hp <- data.frame()
 common_mp <- data.frame()
 common_hm <- as.data.frame(merge(res1, res2, by.x='Gene.Symbol', by.y='Human.gene.name'))
 common_hp <- as.data.frame(merge(res1, res3, by.x='Gene.Symbol', by.y='Human.gene.name'))
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
-pthr=0.1; thr=0
+pthr=0.1; thr=0.5
 hm<-get_stats(common_hm, "human", "mouse", pthr, pthr, thr, thr,0)
 hp<-get_stats(common_hp, "human", "pig", pthr, 0.1, thr, thr, 0)
 mp<-get_stats(common_mp, "mouse", "pig", pthr, 0.1, thr, thr, 0)
@@ -138,6 +141,8 @@ kable(mp[[1]])
 #Mouse vs pig total blood
 res2<-resmb[complete.cases(resmb),]
 res3<-respb[complete.cases(respb),]
+res2<-as.data.frame(merge(res2, IPA, by.x='Human.gene.name', by.y='Molecule.Name'))
+res3<-as.data.frame(merge(res3, IPA, by.x='Human.gene.name', by.y='Molecule.Name'))
 #res3<-respb5[complete.cases(respb5),]
 common_mp <- data.frame()
 common_mp <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='Human.gene.name'))
@@ -202,7 +207,7 @@ res2$partial_seq=substr(res2$seq,1,20)
 res1<-res1[,c(8,10,11,1:3,6:7)]
 res2<-res2[,c(13,10,14,1,6,7,9,8)]
 common_mcbs <- intersect_results(res1,res2)
-mp<-get_stats_pval(common_mcbs,  "pig", "human", pthr, pthr, thr, thr, 0)
+mp<-get_stats(common_mcbs,  "pig", "human", pthr, pthr, thr, thr, 0)
 kable(mp[[1]])
 cons_phbs<-mp[[2]]
 kable(mp[[2]][c(1,4,9,14)])
@@ -216,7 +221,8 @@ res2$partial_seq=substr(res2$seq,1,20)
 res1<-res1[,c(8,10,11,1:3,6:7)]
 res2<-res2[,c(8,10,11,1:3,6:7)]
 common_mcbs <- intersect_results(res1,res2)
-#pthr=0.1; thr=0
+pthr=0.1; thr=0
+#mp<-get_stats_pval(common_mcbs, "mouse", "pig", pthr, pthr, thr, thr, 0)
 mp<-get_stats_pval(common_mcbs, "mouse", "pig", pthr, pthr, thr, thr, 0)
 kable(mp[[1]])
 cons_mpbs<-mp[[2]]
@@ -227,7 +233,7 @@ overlap1<-merge(cons_mpbs,cons_mhbs,by="partial_id.x")
 overlap2<-merge(cons_mpbs,cons_phbs, by.x="partial_id.y", by.y="partial_id.x")
 overlap3<-merge(cons_mhbs,cons_phbs, by.x="partial_id.y", by.y="partial_id.y")
 
-pthr=0.1; thr=0
+pthr=0.2; thr=0
 #Mouse vs pig colon small
 res1<-resmcs
 res2<-respcscorr
@@ -237,11 +243,12 @@ res1<-res1[,c(8,10,11,1:3,6:7)]
 res2<-res2[,c(8,10,11,1:3,6:7)]
 common_mccs <- intersect_results(res1,res2)
 #pthr=0.1; thr=0
-mp<-get_stats_pval(common_mccs, "mouse", "pig", pthr, pthr, thr, thr, 0)
+mp<-get_stats(common_mccs, "mouse", "pig", pthr, pthr, thr, thr, 0)
 kable(mp[[1]])
 cons_mpcs<-mp[[2]]
 kable(mp[[2]][c(1,4,9,14)])
 kable(mp[[3]][c(1,4,9,14)])  
+
 
 
 

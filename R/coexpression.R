@@ -4,7 +4,6 @@ require(gdata)
 library(data.table)
 require("lsa")
 
-
 mmu_name_dict = read.csv("data/coexpression/mouse_ens_refseq_entrez.tsv", header=TRUE, sep="\t")
 mmu_ens_refseq <- mmu_name_dict[mmu_name_dict$RefSeq.mRNA.ID != "",][,c(1,3)]
 mmu_ens_refseq <- unique(mmu_ens_refseq)
@@ -32,24 +31,16 @@ mmu_predicted_filtered <- mmu_predicted[mmu_predicted$binding_probability>0.99,]
 mmu_pred <- merge(mmu_predicted_filtered[,1:4], mmu_ens_refseq, by.x="mRNA", by.y="RefSeq.mRNA.ID")
 mmu_pred$miRNA <- tolower(mmu_pred$miRNA)
 
-cos.sim=function(ma, mb){
-  mat=tcrossprod(ma, mb)
-  t1=sqrt(apply(ma, 1, crossprod))
-  t2=sqrt(apply(mb, 1, crossprod))
-  mat / outer(t1,t2)
-}
+# RAIN interactions
+mmu_rain_predicted <- fread("data/coexpression/10090.v1.predictions.tsv", header=FALSE, sep="\t")
+mmu_rain_predicted_filtered <- mmu_rain_predicted[mmu_rain_predicted$V6 > 0.15,][,c(2,3,6)]
+colnames(mmu_rain_predicted_filtered) <- c("miRNA", "gene", "score")
 
-get_gene_correlations <- function(df1,df2,mmu_pred){
-  #df1 small rna, fd2 long rna
-  df1<-df1[!grepl("^.+(mt|st)$",rownames(df1)),]
-  c<-(cor(t(df2), t(df1), method="spearman"))
-  #c<-(cos.sim(df2, df1))
-  c<-melt(c)
-  c<-data.table(c, keep.rownames = TRUE)
-  names(c)<-c("rn","gene","miRNA","corr")
-  #fwrite(c, "data/coexpression/corr_mouse_colon.csv", sep="\t")
-  return(c)  
-}
+mmu_rain_combined <- fread("data/coexpression/10090.v1.combined.tsv", header=FALSE, sep="\t")
+mmu_rain_combined <- mmu_rain_combined[,c(2:5)]
+colnames(mmu_rain_combined) <- c("miRNA", "gene", "type","score")
+mmu_rain_combined$miRNA <- tolower(mmu_rain_combined$miRNA)
+
 
 # Mirna targets coexpression
 org="mouse"
@@ -57,13 +48,6 @@ pred_full<-mmu_pred[,2:5]
 pred_full<-pred_full[!duplicated(pred_full),]
 pred_full<-pred_full[,c(1:2,4)]
 pred<-aggregate(list(targetloc=rep(1,nrow(pred_full))), pred_full, length)
-
-#meanrldcs<-as.matrix(meanrldcs)
-#meanrldcs[,c("DSS","Control")]<-as.numeric(unlist(meanrldcs[,c("DSS","Control")]))
-#meanrldcs[,c("DSS","Control")]<-as.numeric(meanrldcs[,c("DSS","Control")])
-
-meanrldcs$Diff<-as.numeric(levels(meanrldcs$Diff))[meanrldcs$Diff]
-meanrldcs<-as.data.frame(meanrldcs)
 
 resg<-resmb; resg2<-resmb2; resmir<-resmbs;resmir2<-resmbs2; rlog_small<-rlog_mouse_blood_small; rlog_total<-rlog_mouse_blood_total; exprg<-meantpmb ; exprmir<-meanrldbs;tissue="blood"
 resg<-resmc; resg2<-NULL; resmir<-resmcs; resmir2<-NULL; rlog_small<-rlog_mouse_colon_small; rlog_total<-rlog_mouse_colon_total;  exprg<-meantpmc; exprmir<-meanrldcs; tissue="colon"
@@ -86,20 +70,21 @@ de_genes <- return_sig_no_biotype(resg, NULL, NULL, 0, 0.1, 0.1)
 de_genes_up <-de_genes[de_genes$logFC > 1,]
 de_genes_down <-de_genes[de_genes$logFC < -1,]
 de_mirs <- return_sig_no_biotype(resmir, NULL, NULL, 0, 0.05, 1)
-de_mirs_up <-de_mirs[de_mirs$logFC > 0.1,]
-de_mirs_down <-de_mirs[de_mirs$logFC < - 0.1,]
+de_mirs_up <- de_mirs[de_mirs$logFC > 0.1,]
+de_mirs_down <- de_mirs[de_mirs$logFC < - 0.1,]
 
 deg<-de_genes_down; dem<-de_mirs_up; dirg="down"; dirmir="up"; 
 #deg<-de_genes_up; dem<-de_mirs_down; dirg="up"; dirmir="down"; 
 
 correl_DE_sp <- correl[correl$gene %in% deg$id & correl$miRNA %in% dem$id, ]
-correl_DE <- correl[correl$gene %in% de_genes$id & correl$miRNA %in% de_mirs$id, ]
+#correl_DE <- correl[correl$gene %in% de_genes$id & correl$miRNA %in% de_mirs$id, ]
+correl_DE <- correl[correl$miRNA %in% de_mirs$id, ]
 corr_targets_DE <- merge(correl_DE,pred,by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
 corr_targets_DE[is.na(corr_targets_DE$targetloc),]$targetloc<-0
 plot(jitter(corr_targets_DE$corr), jitter(corr_targets_DE$targetloc), pch=16,cex=0.4)
 
 pdf(paste("figures/hist_miRNA_targets_deg_targetloc",dirg,"_mir_",dirmir,"_",org,"_",tissue,".pdf",sep=""))
-layout(matrix(c(1,2,3,4,5,6), 3, 2, byrow = TRUE), 
+layout(matrix(c(1,2,3,4), 2, 2, byrow = TRUE), 
        widths=c(1,1,1), heights=c(1,1,1))
 hist(corr_targets_DE[corr_targets_DE$targetloc==0,]$corr, main = paste("DE miRNAs and ","DE genes, no targets",sep=""),
      xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
@@ -109,19 +94,24 @@ hist(corr_targets_DE[corr_targets_DE$targetloc>=4,]$corr, main = paste("DE miRNA
      xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
 hist(corr_targets_DE[corr_targets_DE$targetloc>=8,]$corr, main = paste("DE miRNAs and ","DE genes, >8 targets",sep=""),
      xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
-hist(corr_targets_DE[corr_targets_DE$targetloc>=12,]$corr, main = paste("DE miRNAs and ","DE genes, >12 targets",sep=""),
-     xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
-hist(corr_targets_DE[corr_targets_DE$targetloc>=16,]$corr, main = paste("DE miRNAs and ","DE genes, >16 targets",sep=""),
-     xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
+#hist(corr_targets_DE[corr_targets_DE$targetloc>=12,]$corr, main = paste("DE miRNAs and ","DE genes, >12 targets",sep=""),
+#     xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
+#hist(corr_targets_DE[corr_targets_DE$targetloc>=16,]$corr, main = paste("DE miRNAs and ","DE genes, >16 targets",sep=""),
+ #    xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
 dev.off()
 
 # Take the set1 of up or down regulated mirs and compute the predicted ranked targets of set1  
 correl_mir_up <- correl[correl$miRNA %in% de_mirs_up$id, ]
 correl_mir_down <- correl[correl$miRNA %in% de_mirs_down$id, ]
 
-# DE miRNAs and all totalRNA genes found in our data, with target info (not all pairs have target relationship)
+# DE miRNAs and all totalRNA genes found in our data, with target info from mirWalk (not all pairs have target relationship)
 corr_targets_mir_up_full <- merge(correl_mir_up, pred, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
 corr_targets_mir_down_full <- merge(correl_mir_down, pred, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
+
+# DE miRNAs and all totalRNA genes found in our data, with target info from RAIN (not all pairs have target relationship)
+corr_targets_mir_up_full <- merge(correl_mir_up, mmu_rain_combined, by.x=c("gene","miRNA"),by.y=c("gene","miRNA"),all.x=TRUE)
+corr_targets_mir_down_full <- merge(correl_mir_down, mmu_rain_combined, by.x=c("gene","miRNA"),by.y=c("gene","miRNA"), all.x=TRUE)
+
 
 # DE miRNAs and their targets, also found in our data 
 corr_targets_mir_up <- merge(correl_mir_up, pred, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"))
@@ -242,9 +232,7 @@ length(unique(corr_targets_mir_up_f[corr_targets_mir_up_f$gene %in% de_genes_up$
 length(unique(corr_targets_mir_down_f[corr_targets_mir_down_f$gene %in% de_genes_down$id,]$gene))/length(de_genes_down$id)
 length(unique(corr_targets_mir_up_f[corr_targets_mir_up_f$gene %in% de_genes_down$id,]$gene))/length(de_genes_down$id)
 
-
 length((corr_targets_mir_down_f[corr_targets_mir_down_f$gene %in% de_genes_up$id,]$gene))/dim(corr_targets_mir_down[corr_targets_mir_down$gene %in% de_genes_up$id,])[1]
-
 length(unique(corr_targets_mir_down_f[corr_targets_mir_down_f$gene %in% de_genes_down$id,]$gene))/length(corr_targets_mir_down_f$gene)
 
 length(unique(corr_targets_mir_up_f[corr_targets_mir_up_f$gene %in% de_genes_up$id,]$gene))/length(corr_targets_mir_up_f$gene)

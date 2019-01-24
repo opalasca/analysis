@@ -54,6 +54,17 @@ go_term_enrichment_top_expr <- function(res, padjthr, pthr, FCthr, org, tissue){
   return(GOsig)
 }
 
+#enrichment for a given gene list 
+
+go_clust1 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","1")
+go_clust2 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","2")
+
+go_clust3 <- go_term_enrichment_list(clust,resmb,1,"mouse","blood","3")
+go_clust4 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","4")
+go_clust5 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","5")
+go_clust6 <- go_term_enrichment_list(clust,resmb,1,"mouse","blood","6")
+
+
 go_pig_col=go_term_enrichment(respc,0.1,0.2,1, "pig","colon")
 go_mouse_col=go_term_enrichment(resmc,0.1,0.1,1,"mouse","colon")
 go_pig_blood=go_term_enrichment(respb,0.1,0.1,1,"pig","blood")

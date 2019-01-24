@@ -604,12 +604,12 @@ get_stats <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfcthr2,
   opposite <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
                        common$padj.x<pthr1 & common$padj.y<pthr2 & 
                        common$logFC.x*common$logFC.y < 0, ]
-  stats <- c(dim(common)[1], dim(sig1)[1], dim(sig2)[1], dim(sig)[1], dim(opposite)[1])
+  stats <- c(dim(common)[1], dim(sig1)[1], dim(sig2)[1], dim(sig)[1]+dim(opposite)[1], dim(sig)[1], dim(opposite)[1])
   #dimnames = list(c(species1, species2, "consistent dysreg", "inconsistent dysreg"),c(""))
   out <- matrix(stats, nrow = 1)
   write.table(sig, file=paste("results/consistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
   write.table(opposite, file=paste("results/inconsistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
-  colnames(out) <- c("total", species1, species2, "consistent", "opposite" )
+  colnames(out) <- c("total common", paste(species1," DE",sep=""), paste(species2," DE",sep=""), "common DE","consistent", "opposite" )
   data <- list(out, sig, opposite)
   return(data)
 }
@@ -624,17 +624,19 @@ get_stats_pval <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfc
   opposite <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
                        common$pvalue.x<pthr1 & common$pvalue.y<pthr2 & 
                        common$logFC.x*common$logFC.y < 0, ]
-  stats <- c(dim(common)[1], dim(sig1)[1], dim(sig2)[1], dim(sig)[1], dim(opposite)[1])
+  #stats <- c(dim(common)[1], dim(sig1)[1], dim(sig2)[1], dim(sig)[1], dim(opposite)[1])
+  stats <- c(dim(common)[1], dim(sig1)[1], dim(sig2)[1], dim(sig)[1]+dim(opposite)[1], dim(sig)[1], dim(opposite)[1])
+  
   #dimnames = list(c(species1, species2, "consistent dysreg", "inconsistent dysreg"),c(""))
   out <- matrix(stats, nrow = 1)
   write.table(sig, file=paste("results/consistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
   write.table(opposite, file=paste("results/inconsistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
-  colnames(out) <- c("total", species1, species2, "consistent", "opposite" )
+  colnames(out) <- c("total common", paste(species1," DE",sep=""), paste(species2," DE",sep=""), "common DE","consistent", "opposite" )
   data <- list(out, sig, opposite)
   return(data)
 }
 
-heatmap_DE <- function(sig, rld, org, tissue, type, title, timepoint){
+heatmap_DE <- function(sig, rld, org, tissue, type, title, clusters){
   rows <- match(sig$id, row.names(rld))
   mat <- assay(rld)[rows,]
   n=dim(mat)[[1]]
@@ -657,15 +659,17 @@ heatmap_DE <- function(sig, rld, org, tissue, type, title, timepoint){
                 #breaks = breaksList,
                 border_color = "NA",
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
-                #cellwidth=20,
+                cellwidth=20,
                 main=paste(title,",n=",n,sep=""))
-  save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type, "_", timepoint, ".pdf", sep=""))
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type,  ".pdf", sep=""))
   #,width=9,height=7
-  clust <- cbind(mat, cluster = cutree(x$tree_row, k = 5))
+  clust <- cbind(mat, cluster = cutree(x$tree_row, k = clusters))
+  clust<-as.data.frame(clust)
+  clust$id <- rownames(clust)
   return(clust)
 }
 
-heatmap_DE_rownames <- function(sig, rld, org, tissue, type, title, timepoint){
+heatmap_DE_rownames <- function(sig, rld, org, tissue, type, title, timepoint,clusters){
   rows <- match(sig$id, row.names(rld))
   mat <- assay(rld)[rows,]
   n=dim(mat)[[1]]
@@ -688,16 +692,18 @@ heatmap_DE_rownames <- function(sig, rld, org, tissue, type, title, timepoint){
                 #breaks = breaksList,
                 border_color = "NA",
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
-                #cellwidth=20,
+                cellwidth=20,
                 main=paste(title,",n=",n,sep=""))
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type, "_", timepoint, ".pdf", sep=""))
   #,width=9,height=7
-  clust <- cbind(mat, cluster = cutree(x$tree_row, k = 5))
+  clust <- cbind(mat, cluster = cutree(x$tree_row, k = clusters))
+  clust<-as.data.frame(clust)
+  clust$id <- rownames(clust)
   return(clust)
 }
 
 
-heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
+heatmap_DE_ts <- function(sig, rld, org, tissue, type, title, clusters){
   rows <- match(sig$id, row.names(rld))
   mat <- assay(rld)[rows,]
   n=dim(mat)[[1]]
@@ -735,7 +741,9 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title){
                 main=paste(title,",n=",n,sep="") )
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_TS_", org, "_",tissue,"_",type,".pdf", sep=""))
   #,width=9,height=7
-  clust <- cbind(mat, cluster = cutree(x$tree_row, k = 6))
+  clust <- cbind(mat, cluster = cutree(x$tree_row, k = clusters))
+  clust<-as.data.frame(clust)
+  clust$id <- rownames(clust)
   return(clust)
 }
 
@@ -913,14 +921,53 @@ get_mean<-function(rld,coldata,org,tissue,type){
     c3<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="8",])
     m<-cbind(m, id=rownames(m),DSS_day0=rowMeans(rld[,c1]), DSS_day2=rowMeans(rld[,c2]), DSS_day8=rowMeans(rld[,c3]), Diff=rowMeans(rld[,c3])-rowMeans(rld[,c1]))
   }
+  if (tissue=="blood" & org=="pig"){
+    c1<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="0",])
+    c2<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="2",])
+    c3<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="4",])
+    c4<-rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time=="5",])
+    m<-cbind(m, id=rownames(m),DSS_day0=rowMeans(rld[,c1]), DSS_day2=rowMeans(rld[,c2]), DSS_day4=rowMeans(rld[,c3]),DSS_day5=rowMeans(rld[,c4]), Diff=rowMeans(rld[,c3])-rowMeans(rld[,c1]))
+  }
   m<-as.matrix(m)
   #m[,c("Diff")]<-as.numeric(levels(m[,c("Diff")]))[m[,c("Diff")]]
   m[,c("Diff")]<-as.numeric(unlist(m[,c("Diff")]))
   m<-as.data.frame(m)
   m$Diff<-as.numeric(levels(m$Diff))[m$Diff]
-  write.table(m,file=paste("results/mean_rlog_", org, "_", tissue, "_",type,".tsv",sep=""), sep="\t", row.names=FALSE, quote = F )
+  write.table(m,file=paste("results/mean_expr_", org, "_", tissue, "_",type,".tsv",sep=""), sep="\t", row.names=FALSE, quote = F )
   return(m)
 }
 
+get_gene_correlations <- function(df1,df2,mmu_pred){
+  #df1 small rna, fd2 long rna
+  df1<-df1[!grepl("^.+(mt|st)$",rownames(df1)),]
+  c<-(cor(t(df2), t(df1), method="spearman"))
+  #c<-(cos.sim(df2, df1))
+  c<-melt(c)
+  c<-data.table(c, keep.rownames = TRUE)
+  names(c)<-c("rn","gene","miRNA","corr")
+  #fwrite(c, "data/coexpression/corr_mouse_colon.csv", sep="\t")
+  return(c)  
+}
 
+go_term_enrichment_list <- function(clust, res, padjthr, org, tissue, cluster_no ){
+  #res=resmb; padjthr=0.1; cluster_no="1"
+  res <- res[complete.cases(res),]
+  assayed.genes <- res$Human.gene.stable.ID
+  de.genes <- res$Human.gene.stable.ID[which(res$id %in% rownames(clust[clust$cluster==cluster_no,]))]
+  print(de.genes)
+  gene.vector <- as.integer(assayed.genes%in%de.genes)
+  names(gene.vector) = assayed.genes
+  table(gene.vector)
+  pwf=nullp(gene.vector,"hg19","ensGene") 
+  GO.wall=goseq(pwf,"hg19","ensGene",test.cats=c("GO:MF","GO:BP"))
+  GO.wall$padj <- p.adjust(GO.wall$over_represented_pvalue,method="BH")
+  GOsig <- subset(GO.wall, padj <= padjthr)
+  write.table(GOsig[,c(6,8,4,5)], file=paste("results/go_term_enrichment_", org, "_", tissue,"_cluster_",cluster_no, ".tsv", sep=""), sep="\t", row.names = FALSE,quote = FALSE)
+  d <- GOsig[1:20,c(6,8,4,5)]
+  png(paste("tables/go_top_", org, "_", tissue, ".png", sep=""),height = 30*nrow(d), width =150*ncol(d))
+  #grid.table(d,rows=NULL)
+  dev.off()
+  
+  return(GOsig)
+}
 
