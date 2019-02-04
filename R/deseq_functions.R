@@ -18,6 +18,9 @@ library(ggrepel)
 library(cowplot)
 library(knitr) 
 library("fdrtool") 
+library("goseq")
+library(GO.db)
+
 
 #require("twbattaglia/btools")
 

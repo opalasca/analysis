@@ -64,7 +64,10 @@ common_genes <- merge(unique(pred_full[,c("Gene.stable.ID")]), unique(correl_all
 # filter correlation table for genes common with pred file
 correl <- correl_all[correl_all$gene %in% common_genes$Gene.stable.ID & correl_all$miRNA %in% common_mirs$miRNA, ]
 #filter correlation table for DE genes and mirs
-corr_targets <- merge(correl,pred,by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
+#corr_targets <- merge(correl,pred,by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
+
+corr_targets <- merge(correl_all,pred,by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
+
 
 de_genes <- return_sig_no_biotype(resg, NULL, NULL, 0, 0.1, 0.1)
 de_genes_up <-de_genes[de_genes$logFC > 1,]
@@ -78,26 +81,28 @@ deg<-de_genes_down; dem<-de_mirs_up; dirg="down"; dirmir="up";
 
 correl_DE_sp <- correl[correl$gene %in% deg$id & correl$miRNA %in% dem$id, ]
 #correl_DE <- correl[correl$gene %in% de_genes$id & correl$miRNA %in% de_mirs$id, ]
-correl_DE <- correl[correl$miRNA %in% de_mirs$id, ]
+#correl_DE <- correl[correl$miRNA %in% de_mirs$id, ]
+correl_DE <- correl_all[correl_all$miRNA %in% de_mirs$id, ]
+
 corr_targets_DE <- merge(correl_DE,pred,by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
 corr_targets_DE[is.na(corr_targets_DE$targetloc),]$targetloc<-0
 plot(jitter(corr_targets_DE$corr), jitter(corr_targets_DE$targetloc), pch=16,cex=0.4)
 
 pdf(paste("figures/hist_miRNA_targets_deg_targetloc",dirg,"_mir_",dirmir,"_",org,"_",tissue,".pdf",sep=""))
-layout(matrix(c(1,2,3,4), 2, 2, byrow = TRUE), 
+layout(matrix(c(1,2,3,4,5,6), 3, 2, byrow = TRUE), 
        widths=c(1,1,1), heights=c(1,1,1))
-hist(corr_targets_DE[corr_targets_DE$targetloc==0,]$corr, main = paste("DE miRNAs and ","DE genes, no targets",sep=""),
+hist(corr_targets_DE[corr_targets_DE$targetloc==0,]$corr, main = paste("DE miRNAs and ","all genes, no targets",sep=""),
      xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
-hist(corr_targets_DE[corr_targets_DE$targetloc>=1,]$corr, main = paste("DE miRNAs and ","DE genes, >=1 target",sep=""),
+hist(corr_targets_DE[corr_targets_DE$targetloc>=1,]$corr, main = paste("DE miRNAs and ","all genes, >=1 target",sep=""),
      xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
-hist(corr_targets_DE[corr_targets_DE$targetloc>=4,]$corr, main = paste("DE miRNAs and ","DE genes, >=4 targets",sep=""),
+hist(corr_targets_DE[corr_targets_DE$targetloc>=2,]$corr, main = paste("DE miRNAs and ","all genes, >=2 targets",sep=""),
      xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
-hist(corr_targets_DE[corr_targets_DE$targetloc>=8,]$corr, main = paste("DE miRNAs and ","DE genes, >8 targets",sep=""),
+hist(corr_targets_DE[corr_targets_DE$targetloc>=3,]$corr, main = paste("DE miRNAs and ","all genes, >3 targets",sep=""),
      xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
-#hist(corr_targets_DE[corr_targets_DE$targetloc>=12,]$corr, main = paste("DE miRNAs and ","DE genes, >12 targets",sep=""),
-#     xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
-#hist(corr_targets_DE[corr_targets_DE$targetloc>=16,]$corr, main = paste("DE miRNAs and ","DE genes, >16 targets",sep=""),
- #    xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
+hist(corr_targets_DE[corr_targets_DE$targetloc>=4,]$corr, main = paste("DE miRNAs and ","all genes, >4 targets",sep=""),
+     xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
+hist(corr_targets_DE[corr_targets_DE$targetloc>=7,]$corr, main = paste("DE miRNAs and ","all genes, >7 targets",sep=""),
+     xlab = "Spearman's correlation coefficients", xlim = range(-1:1))
 dev.off()
 
 # Take the set1 of up or down regulated mirs and compute the predicted ranked targets of set1  
