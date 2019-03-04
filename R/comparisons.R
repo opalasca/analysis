@@ -13,18 +13,21 @@ curated_mirs_blood$partial_id=tolower(curated_mirs_blood$partial_id)
 
 #Mouse colon vs blood total
 res2<-resmc
-res3<-resmb8
+#res3<-resmb8
+res3<-resmb
 common_mcbt <- data.frame()
 common_mcbt <- as.data.frame(merge(res2, res3, by.x='id', by.y='id'))
 common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
 common_mcbt <- common_mcbt[(common_mcbt$biotype.x %in% lncRNAs),]
-pthr=0.1; thr=1
+pthr=0.05; thr=1
 mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
+mp<-get_stats_v2(common_mcbt, res2, res3, protein_coding, "colon", "blood", pthr, pthr, thr, thr, 0)
 mp[[1]]
 cons_mcbt<-mp[[2]]
 dim(cons_mcbt[cons_mcbt$logFC.x<1,])
 cons_lnc <- cons_mcbt[cons_mcbt$biotype.x %in% lncRNAs,]
 cons_pc <- cons_mcbt[cons_mcbt$biotype.x=="protein_coding",]
+res2_pc <- res2[res2$biotype=="protein_coding" & abs(res2$logFC)>1 & res2$padj<0.05,]
 
 
 #Pig colon vs blood total
@@ -248,6 +251,28 @@ kable(mp[[1]])
 cons_mpcs<-mp[[2]]
 kable(mp[[2]][c(1,4,9,14)])
 kable(mp[[3]][c(1,4,9,14)])  
+
+
+
+#Mouse vs pig subclusters
+res2<-resmc[complete.cases(resmc),]
+
+res2<-pig_colon_cluster_up[complete.cases(pig_colon_cluster_up),]
+res3<-mouse_blood_cluster_M72
+#res2<-as.data.frame(merge(res2, IPA, by.x='Mouse.gene.stable.ID', by.y='id'))
+#res3<-as.data.frame(merge(res3, IPA, by.x='Human.gene.name', by.y='Molecule.Name'))
+#res3<-respb5[complete.cases(respb5),]
+common_mp <- data.frame()
+common_mp <- as.data.frame(merge(res2, res3, by.x='Mouse.gene.stable.ID', by.y='id'))
+pthr=1; thr=0
+mp<-get_stats(common_mp, "mouse", "pig", pthr, 1, thr, thr, 0)
+kable(mp[[1]])
+cons_mpb<-mp[[2]]
+
+p<-res2[,c('Mouse.gene.stable.ID'),drop=FALSE]
+m<-res3[,"id",drop=FALSE]
+common_mp <- as.data.frame(merge(p, m, by.x='Mouse.gene.stable.ID', by.y='id'))
+
 
 
 

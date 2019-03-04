@@ -20,7 +20,8 @@ library(knitr)
 library("fdrtool") 
 library("goseq")
 library(GO.db)
-
+library(dplyr)
+library(tidyr)
 
 #require("twbattaglia/btools")
 
@@ -313,7 +314,8 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   #ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
 }
 
-get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, idname, mir_seq=NULL, timepoint, cond1, cond2){
+get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, idname, mir_seq=NULL, timepoint, cond1, cond2,spec){
+  now <- as.Date(Sys.time())
   if (timepoint=="" & is.null(cond1)){
     print("no timepoint")
     res <- results(dds,cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
@@ -348,9 +350,13 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", bio
     resOrdered <- as.data.frame(merge(resOrdered, orth1, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
     resOrdered <- as.data.frame(merge(resOrdered, orth2, by.x='id', by.y='Gene.stable.ID', all.x=TRUE))
     resOrdered <- as.data.frame(merge(resOrdered, idname, by.x='id', by.y='id', all.x=TRUE))
-    write.table(resOrdered[c(1,2,3,6,7,12,8,9,10,11)], file=paste("results/", org, "_", tissue, "_",type, "_", thr, "_thr", ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    rs<-resOrdered[c(1,2,3,6,7,12,8,9,10,11)]
+    #rs<-unique(rs)
+    write.table(rs, file=paste("results/", org, "_", tissue, "_",type, "_", "full", "_", now, spec,".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    #write.table(resOrdered[c(1,2,3,6,7,12,8,9,10,11)], file=paste("results/", org, "_", tissue, "_",type, "_", "full", "_", now, ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    write.table(rs[abs(rs$logFC)>=1 & rs$padj<=0.05,], file=paste("results/", org, "_", tissue, "_",type, "_", "padj_0.05_logFC_1", "_", now, spec,".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
     resOrdered <- merge(resOrdered, biotypes, by.x='id',by.y='id', all.x=TRUE)
-}
+    }
   #resOrdered_uc_co<-resOrdered_uc_co[resOrdered_uc_co$padj < thr,]
   resSig <- subset(resOrdered, padj <= thr)
   return(resSig)
@@ -599,24 +605,66 @@ draw_logFC_corr <- function(data1, data2, common, p1, p2){
 
 get_stats <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfcthr2, exprthr){
   sig1 <- common[abs(common$logFC.x)>lfcthr1 & common$padj.x<pthr1, ]
+  sig1_up <- common[common$logFC.x>lfcthr1 & common$padj.x<pthr1, ]
+  sig1_down <- common[common$logFC.x<(-lfcthr1) & common$padj.x<pthr1, ]
+  
   sig2 <- common[abs(common$logFC.y)>lfcthr2 & common$padj.y<pthr2, ]
+  sig2_up <- common[common$logFC.y>lfcthr2 & common$padj.y<pthr2, ]
+  sig2_down <- common[common$logFC.y<(-lfcthr2) & common$padj.y<pthr2, ]
+  
   sig <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
                   common$padj.x<pthr1 & common$padj.y<pthr2 & 
                   common$avg.expr.y > exprthr &
                   common$logFC.x*common$logFC.y > 0, ]
+  sig_up <- sig[sig$logFC.x>0,]
+  sig_down <- sig[sig$logFC.x<0,]
   opposite <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
                        common$padj.x<pthr1 & common$padj.y<pthr2 & 
                        common$logFC.x*common$logFC.y < 0, ]
-  stats <- c(dim(common)[1], dim(sig1)[1], dim(sig2)[1], dim(sig)[1]+dim(opposite)[1], dim(sig)[1], dim(opposite)[1])
+  stats <- c(dim(common)[1], dim(sig1)[1],dim(sig1_up)[1],dim(sig1_down)[1], dim(sig2)[1], dim(sig2_up)[1],dim(sig2_down)[1],dim(sig)[1]+dim(opposite)[1], dim(sig)[1], dim(sig_up)[1], dim(sig_down)[1], dim(opposite)[1])
   #dimnames = list(c(species1, species2, "consistent dysreg", "inconsistent dysreg"),c(""))
   out <- matrix(stats, nrow = 1)
   write.table(sig, file=paste("results/consistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
   write.table(opposite, file=paste("results/inconsistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
-  colnames(out) <- c("total common", paste(species1," DE",sep=""), paste(species2," DE",sep=""), "common DE","consistent", "opposite" )
+  colnames(out) <- c("total common", paste(species1," DE",sep=""), paste(species1," up",sep=""), paste(species1," down",sep=""),paste(species2," DE",sep=""),paste(species2," up",sep=""), paste(species2," down",sep=""), "common DE","consistent","consistent_up","consistent_down", "opposite" )
   data <- list(out, sig, opposite)
   return(data)
 }
 
+get_stats_v2 <- function(common,res1,res2,biotype, species1, species2, pthr1,pthr2, lfcthr1, lfcthr2, exprthr){
+  sig1 <- common[abs(common$logFC.x)>lfcthr1 & common$padj.x<pthr1, ]
+  sig1_up <- common[common$logFC.x>lfcthr1 & common$padj.x<pthr1, ]
+  sig1_down <- common[common$logFC.x<(-lfcthr1) & common$padj.x<pthr1, ]
+  
+  sig2 <- common[abs(common$logFC.y)>lfcthr2 & common$padj.y<pthr2, ]
+  sig2_up <- common[common$logFC.y>lfcthr2 & common$padj.y<pthr2, ]
+  sig2_down <- common[common$logFC.y<(-lfcthr2) & common$padj.y<pthr2, ]
+  
+  res1f <- res1[res1$biotype %in% biotype & abs(res1$logFC)>lfcthr1 & res1$padj<pthr1,]
+  res2f <- res2[res2$biotype %in% biotype & abs(res2$logFC)>lfcthr2 & res2$padj<pthr2,]
+  res1f_up <- res1f[res1f$logFC>0,]
+  res1f_down <- res1f[res1f$logFC<0,]
+  res2f_up <- res2f[res2f$logFC>0,]
+  res2f_down <- res2f[res2f$logFC<0,]
+  
+  sig <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
+                  common$padj.x<pthr1 & common$padj.y<pthr2 & 
+                  common$avg.expr.y > exprthr &
+                  common$logFC.x*common$logFC.y > 0, ]
+  sig_up <- sig[sig$logFC.x>0,]
+  sig_down <- sig[sig$logFC.x<0,]
+  opposite <- common[abs(common$logFC.x)>lfcthr1 & abs(common$logFC.y)>lfcthr2 & 
+                       common$padj.x<pthr1 & common$padj.y<pthr2 & 
+                       common$logFC.x*common$logFC.y < 0, ]
+  stats <- c( dim(res1f)[1],dim(res1f_up)[1],dim(res1f_down)[1], dim(res2f)[1], dim(res2f_up)[1],dim(res2f_down)[1],dim(sig)[1]+dim(opposite)[1], dim(sig)[1], dim(sig_up)[1], dim(sig_down)[1], dim(opposite)[1])
+  #dimnames = list(c(species1, species2, "consistent dysreg", "inconsistent dysreg"),c(""))
+  out <- matrix(stats, nrow = 1)
+  write.table(sig, file=paste("results/consistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
+  write.table(opposite, file=paste("results/inconsistent_",species1,"_",species2, ".tsv",sep=""), row.names=F, sep="\t")
+  colnames(out) <- c(paste(species1," DE",sep=""), paste(species1," up",sep=""), paste(species1," down",sep=""),paste(species2," DE",sep=""),paste(species2," up",sep=""), paste(species2," down",sep=""), "common DE","consistent","consistent_up","consistent_down", "opposite" )
+  data <- list(out, sig, opposite)
+  return(data)
+}
 get_stats_pval <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfcthr2, exprthr){
   sig1 <- common[abs(common$logFC.x)>lfcthr1 & common$pvalue.x<pthr1, ]
   sig2 <- common[abs(common$logFC.y)>lfcthr2 & common$pvalue.y<pthr2, ]
@@ -639,19 +687,23 @@ get_stats_pval <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfc
   return(data)
 }
 
-heatmap_DE <- function(sig, rld, org, tissue, type, title, clusters){
+heatmap_DE_kmeans <- function(sig, rld, mat, org, tissue, type, title, clusters, cluster_rows){
   rows <- match(sig$id, row.names(rld))
-  mat <- assay(rld)[rows,]
+  #mat <- assay(rld)[rows,]
+  #mat <- rld[rows,]
   n=dim(mat)[[1]]
   df <- as.data.frame(colData(rld))
   df = df[-c(2:7)]
   #breaksList = seq(-2, 2, by = 0.25)
   annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
   x <- pheatmap(mat, 
-                scale="row",
-                cluster_rows=TRUE,
+                scale="none",
+                #cluster_rows=TRUE,
+                cluster_rows=cluster_rows,
                 cluster_cols =FALSE, 
                 show_rownames=FALSE,
+                method="ward.D",
+                #clustering_distance_rows = "correlation",
                 #show_colnames=FALSE,
                 annotation_col=df,
                 annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
@@ -666,7 +718,43 @@ heatmap_DE <- function(sig, rld, org, tissue, type, title, clusters){
                 main=paste(title,",n=",n,sep=""))
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type,  ".pdf", sep=""))
   #,width=9,height=7
-  clust <- cbind(mat, cluster = cutree(x$tree_row, k = clusters))
+  #clust <- cbind(mat, cluster = cutree(x$tree_row, h=1))#,k = clusters
+  #clust<-as.data.frame(clust)
+  #clust$id <- rownames(clust)
+  #return(clust)
+}
+
+heatmap_DE <- function(sig, rld, org, tissue, type, title, clusters, cluster_rows){
+  rows <- match(sig$id, row.names(rld))
+  mat <- assay(rld)[rows,]
+  n=dim(mat)[[1]]
+  df <- as.data.frame(colData(rld))
+  df = df[-c(2:7)]
+  #breaksList = seq(-2, 2, by = 0.25)
+  annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
+  x <- pheatmap(mat, 
+                scale="row",
+                #cluster_rows=TRUE,
+                cluster_rows=cluster_rows,
+                cluster_cols =FALSE, 
+                show_rownames=FALSE,
+                method="ward.D",
+                #clustering_distance_rows = "correlation",
+                #show_colnames=FALSE,
+                annotation_col=df,
+                annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
+                #annotation_legend = FALSE,
+                annotation_names_col = FALSE,
+                #annotation_col=c("DSS","Control"),
+                key.title = "Row-wise Z-score",
+                #breaks = breaksList,
+                border_color = "NA",
+                #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
+                cellwidth=20,
+                main=paste(title,",n=",n,sep=""))
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type,  ".pdf", sep=""))
+  #,width=9,height=7
+  clust <- cbind(mat, cluster = cutree(x$tree_row, h=1))#,k = clusters
   clust<-as.data.frame(clust)
   clust$id <- rownames(clust)
   return(clust)
@@ -729,6 +817,58 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title, clusters){
                 cluster_rows=TRUE,
                 cluster_cols=FALSE, 
                 show_rownames=FALSE,
+                method="single",
+                clustering_distance_rows = "correlation",
+                #show_colnames=FALSE,
+                annotation_col=df,
+                #annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
+                annotation_colors = time_colors,
+                #annotation_legend = FALSE,
+                #annotation_names_col = FALSE,
+                #annotation_col=c("DSS","Control"),
+                key.title = "Row-wise Z-score",
+                #breaks = breaksList,
+                border_color = "NA",
+                #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
+                #cellwidth=20,
+                main=paste(title,",n=",n,sep="") )
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_TS_", org, "_",tissue,"_",type,".pdf", sep=""))
+  #,width=9,height=7
+  clust <- cbind(mat, cluster = cutree(x$tree_row, k = clusters))
+  clust<-as.data.frame(clust)
+  clust$id <- rownames(clust)
+  return(clust)
+}
+
+heatmap_DE_ts_rownames <- function(sig, rld, org, tissue, type, title, clusters){
+  rows <- match(sig$id, row.names(rld))
+  mat <- assay(rld)[rows,]
+  mat <- as.data.frame(mat)
+  mat$id <- rownames(mat)
+  matm <- merge(mat,sig[,c('id','name')],by='id')
+  rownames(matm)<-matm$name
+  matm<-matm[,!(names(matm) %in% c("id","name"))]
+  mat <- as.matrix(matm)
+  n=dim(mat)[[1]]
+  df <- as.data.frame(colData(rld))
+  df = df[-c(2,4,5,6,7)]
+  breaksList = seq(-2, 2, by = 0.25)
+  if (org=="mouse"){
+    #time_colors = list(time=c("0"="grey80", "2"="grey50", "8"="grey30"),condition=c(DSS="grey30", Control="grey70"))
+    time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "8"="#6BAED6"),condition=c(DSS="grey30", Control="grey70"))
+  }
+  else{
+    #time_colors = list(time=c("0"="grey80", "2"="grey60", "4"="grey40", "5"="grey25"),condition=c(DSS="grey30", Control="grey70"))
+    #time_colors = list(condition=c(DSS="grey30", Control="grey70"))
+    #time_colors = list(time=c("0"="azure", "2"="cadetblue1", "4"="cornflowerblue", "5"="deepskyblue4"),condition=c(DSS="grey30", Control="grey70"))
+    time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "4"="#6BAED6", "5"="#2171B5"),condition=c(DSS="grey30", Control="grey70"))
+  }
+  annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
+  x <- pheatmap(mat, 
+                scale="row",
+                cluster_rows=TRUE,
+                cluster_cols=FALSE, 
+                #show_rownames=FALSE,
                 #show_colnames=FALSE,
                 annotation_col=df,
                 #annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
@@ -809,6 +949,7 @@ return_sig<-function(res1,res2,res3,lfc,pval,padj,biotypes){
     sigtmp <-merge(sig1, sig2, by.x='id', by.y='id', all.x=TRUE,all.y=TRUE)
     sig <-merge(sigtmp, sig3, by.x='id', by.y='id',all.x=TRUE, all.y=TRUE)
   }
+  #sig<-merge(sig, names, by.x='id', by.y='Gene.stable.ID')
   return(sig)
 }
 
@@ -973,4 +1114,5 @@ go_term_enrichment_list <- function(clust, res, padjthr, org, tissue, cluster_no
   
   return(GOsig)
 }
+
 

@@ -37,8 +37,8 @@ resmcs <- as.data.frame(get_results(ddsm, "mouse", "colon", "small", 1, mh_orth,
 ddsmcs<-ddsm
 hist(resmcs$pvalue)
 sig<-return_sig(resmcs, NULL, NULL, 0, 0.1, 0.2, miRNAs)
-clust<-heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs","")
-heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs","")
+clust<-heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs",2)
+heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs",2)
 rlog_mouse_colon_small <- assay(rld)
 meanrldcs<-get_mean(rlog_mouse_colon_small, coldata, "mouse", "colon", "small")
 

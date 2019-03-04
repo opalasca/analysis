@@ -29,20 +29,29 @@ mmu_rain <- merge(mmu_rain_combined, mmu_ens_gene_prot, by.x="prot", by.y="Prote
 mmu_rain <- mmu_rain[order(mmu_rain$Gene.stable.ID, mmu_rain$miRNA, -mmu_rain$score),]
 mmu_rain <- mmu_rain[!duplicated(mmu_rain[,c("miRNA","Gene.stable.ID")]),]
 
+#RIsearch2 near perfect complementarity interactions
+mmu_risearch <- fread("data/coexpression/risearch_mmu.tsv", header=FALSE, sep="\t")
+names(mmu_risearch) = c("mirna","startpos","gene","transcript","energy","cigar")
+
 #Read expression/correlation data
 org="mouse"
 resg<-resmb; resg2<-resmb2; resmir<-resmbs;resmir2<-resmbs2; rlog_small<-rlog_mouse_blood_small; rlog_total<-rlog_mouse_blood_total; exprg<-meantpmb ; exprmir<-meanrldbs;tissue="blood"
 resg<-resmc; resg2<-NULL; resmir<-resmcs; resmir2<-NULL; rlog_small<-rlog_mouse_colon_small; rlog_total<-rlog_mouse_colon_total;  exprg<-meantpmc; exprmir<-meanrldcs; tissue="colon"
 
-rlog_small<-rlog_small[rownames(rlog_small) %in% resmir[resmir$avg.expr>100,]$id,]
-rlog_total<-rlog_total[rownames(rlog_total) %in% resg[resg$avg.expr>100,]$id,]
+rlog_small<-rlog_small[rownames(rlog_small) %in% resmir[resmir$avg.expr>30,]$id,]
+rlog_total<-rlog_total[rownames(rlog_total) %in% resg[resg$avg.expr>30,]$id,]
 
+de_mirs <- return_sig_no_biotype(resmir, NULL, NULL, 0, 0.2, 1)
 correl_all <- get_gene_correlations(rlog_small,rlog_total)
+correl_risearch <- merge(correl_all, mmu_risearch, by.x=c("gene","miRNA"),by.y=c("gene","mirna"))
+correl_risearch_DE <- correl_risearch[correl_risearch$miRNA %in% de_mirs$id, ]
+hist(correl_risearch_DE$corr)
+
 logFCthr=1
 de_genes <- return_sig_no_biotype(resg, NULL, NULL, 0, 0.1, 0.1)
 de_genes_up <-de_genes[de_genes$logFC > logFCthr,]
 de_genes_down <-de_genes[de_genes$logFC < -logFCthr,]
-de_mirs <- return_sig_no_biotype(resmir, NULL, NULL, 0, 0.05, 0.3)
+de_mirs <- return_sig_no_biotype(resmir, NULL, NULL, 0, 0.1, 0.4)
 de_mirs_up <-de_mirs[de_mirs$logFC > logFCthr,]
 de_mirs_down <-de_mirs[de_mirs$logFC < - logFCthr,]
 
@@ -52,6 +61,17 @@ pred_mirs <- unique(mmu_rain[,c("miRNA")])
 # filter correlation table for genes common with pred file
 correl_filtered <- correl_all[correl_all$gene %in% pred_targets$Gene.stable.ID  & correl_all$miRNA %in% pred_mirs$miRNA, ]
 correl_targets <- merge(correl_filtered, mmu_rain, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
+
+
+corr_targets_rain_only <- merge(correl_filtered, mmu_rain, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"))
+resgf<-resg[,c("id","logFC","padj")]
+resmirf<-resmir[,c("id","logFC","padj")]
+corr_targets_rain_genelogFC <- merge(corr_targets_rain_only, resgf, by.x="gene", by.y="id")
+colnames(corr_targets_rain_genelogFC)[c(8,9)] <- c("gene_logFC","gene_padj")
+corr_targets_rain_logFC <- merge(corr_targets_rain_genelogFC, resmirf, by.x="miRNA", by.y="id")
+colnames(corr_targets_rain_logFC)[c(10,11)] <- c("mir_logFC","mir_padj")
+write.table(corr_targets_rain_logFC, file=paste("results/corr_targets_rain_logFC_", org, "_", tissue, ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+
 
 correl_DE <- correl_filtered[correl_filtered$miRNA %in% de_mirs$id & correl_filtered$gene %in% de_genes$id, ]
 correl_targets_DE <- merge(correl_DE, mmu_rain, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
