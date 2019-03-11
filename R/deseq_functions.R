@@ -157,29 +157,15 @@ get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
   return(dds)
 }
 
-get_deseq_ref_D <- function(cts, coldata, sample_list, rowsums, thr){
-  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
-                                colData = coldata[sample_list,],
-                                design = ~ condition)
-  #design = ~ time)
-  print(nrow(dds))
-  dds <- estimateSizeFactors(dds)
-  mnc <- rowMeans(counts(dds, normalized=TRUE))
-  dds <- dds[mnc > 5,]
-  #dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
-  #dds<-dds[rowSums(counts(dds)) >= thr,] 
-  print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "DSS")
-  dds <- DESeq(dds)
-  print(nrow(dds))
-  return(dds)
-}
+
 get_deseq_time_cond_merged <- function(cts, coldata, sample_list, rowsums, thr, refcond){
   # A design that takes all blood samples into consideration, by treating all control timepoints,
   # together with day0DSS as control
   coldata$timecond <- paste("day",coldata$time,"_",coldata$condition,sep="")
   coldata$timecond[coldata$condition=="Control"] <- "day0_DSS" 
+  coldata$timecond[coldata$timecond=="day0_DSS"] <- "Control" 
   coldata$timecond <- as.factor(coldata$timecond)
+  print(coldata)
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
                                 colData = coldata[sample_list,],
                                 design = ~ timecond)
@@ -188,11 +174,13 @@ get_deseq_time_cond_merged <- function(cts, coldata, sample_list, rowsums, thr, 
   mnc <- rowMeans(counts(dds, normalized=TRUE))
   dds <- dds[mnc > 3,]
   print(nrow(dds))
-  dds$timecond <- relevel(dds$timecond, ref = refcond)
+  dds$timecond <- relevel(dds$timecond, ref = "Control")
   dds <- DESeq(dds)
   print(nrow(dds))
   return(dds)
 }
+
+
 
 get_deseq_time_cond_merged_plus_batch <- function(cts, coldata, sample_list, rowsums, thr, refcond){
   # A design that takes all blood samples into consideration, by treating all control timepoints,
@@ -309,21 +297,35 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
               col=colors)
   save_pheatmap_pdf(x, paste("figures/sample_distance_", org, "_",tissue,"_",type,".pdf", sep=""),width=9,height=7) 
   group="condition"
-  if (time==TRUE) {group="time"}
+  if (time==TRUE) {group="timecond"}
   print(group)
-  plotPCA(vsd, intgroup=c(group)) +
+if (group=="condition"){
+    plotPCA(vsd, intgroup=c(group)) +
     aes(label = name)+
-    #geom_label_repel()+
-    geom_text_repel()+#(segment.color = 'transparent')+
+    geom_text_repel(size=3, segment.color = 'transparent')+
     theme(axis.text=element_text(size=13),axis.title=element_text(size=14,face="bold"),
           plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))+
     scale_x_continuous() +
     scale_y_continuous()+
-    labs(fill="condition")
+    scale_color_manual(values=c("darkturquoise", "coral1"))
+    #labs(fill="condition")
+}
+  else{
+    plotPCA(vsd, intgroup=c(group)) +
+      aes(label = name)+
+      #geom_label_repel()+
+      geom_text_repel(size=3)+ #segment.color = 'transparent')+
+      theme(axis.text=element_text(size=13),axis.title=element_text(size=14,face="bold"),
+            plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))+
+      scale_x_continuous() +
+      scale_y_continuous()+
+      #labs(fill="condition")
+      scale_color_manual(values=c("darkturquoise", "chartreuse3", "coral1"))#+
+      #labs(fill="timecond")
+  }
   ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=5, height=4, dpi = 1000)
   #ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".pdf", sep=""))
   dev.off()
-  #ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
   }
 
 get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, idname, mir_seq=NULL, timepoint, cond1, cond2,spec){

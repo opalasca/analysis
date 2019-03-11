@@ -97,7 +97,7 @@ m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
 o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
 m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
 colnames(m.kmeans)[dim(m.kmeans)[2]] <- c("cluster")
-heatmap_DE_kmeans_ts(sig,rld,m.kmeans[,1:18],"mouse","blood","total_protein_coding","Protein coding",4, FALSE)
+heatmap_DE_kmeans_ts(sig,rld,m.kmeans[,1:18],"mouse","blood","small","miRNAs",4, FALSE)
 
 
 # Pig colon

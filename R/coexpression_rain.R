@@ -35,8 +35,8 @@ names(mmu_risearch) = c("mirna","startpos","gene","transcript","energy","cigar")
 
 #Read expression/correlation data
 org="mouse"
-resg<-resmb; resg2<-resmb2; resmir<-resmbs;resmir2<-resmbs2; rlog_small<-rlog_mouse_blood_small; rlog_total<-rlog_mouse_blood_total; exprg<-meantpmb ; exprmir<-meanrldbs;tissue="blood"
-resg<-resmc; resg2<-NULL; resmir<-resmcs; resmir2<-NULL; rlog_small<-rlog_mouse_colon_small; rlog_total<-rlog_mouse_colon_total;  exprg<-meantpmc; exprmir<-meanrldcs; tissue="colon"
+resg<-resmb; resg2<-resmb2; resmir<-resmbs;resmir2<-resmbs2; rlog_small<-rlog_mouse_blood_small; rlog_total<-rlog_mouse_blood_total; exprmir<-meanrldbs;tissue="blood";#exprg<-meantpmb ; 
+resg<-resmc; resg2<-NULL; resmir<-resmcs; resmir2<-NULL; rlog_small<-rlog_mouse_colon_small; rlog_total<-rlog_mouse_colon_total; exprmir<-meanrldcs; tissue="colon"; #exprg<-meantpmc;
 
 rlog_small<-rlog_small[rownames(rlog_small) %in% resmir[resmir$avg.expr>30,]$id,]
 rlog_total<-rlog_total[rownames(rlog_total) %in% resg[resg$avg.expr>30,]$id,]
@@ -61,7 +61,6 @@ pred_mirs <- unique(mmu_rain[,c("miRNA")])
 # filter correlation table for genes common with pred file
 correl_filtered <- correl_all[correl_all$gene %in% pred_targets$Gene.stable.ID  & correl_all$miRNA %in% pred_mirs$miRNA, ]
 correl_targets <- merge(correl_filtered, mmu_rain, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"), all.x=TRUE)
-
 
 corr_targets_rain_only <- merge(correl_filtered, mmu_rain, by.x=c("gene","miRNA"),by.y=c("Gene.stable.ID","miRNA"))
 resgf<-resg[,c("id","logFC","padj")]
