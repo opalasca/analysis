@@ -36,7 +36,7 @@ resmcs<-NULL
 resmcs <- as.data.frame(get_results(ddsm, "mouse", "colon", "small", 1, mh_orth, pm_orth, m_biotypes,"", m_seq, "", NULL, NULL))
 ddsmcs<-ddsm
 hist(resmcs$pvalue)
-sig<-return_sig(resmcs, NULL, NULL, 0, 0.1, 0.2, miRNAs)
+sig<-return_sig(resmcs, NULL, NULL, 0.5, 0.1, 0.1, miRNAs)
 clust<-heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs",2)
 heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs",2)
 rlog_mouse_colon_small <- assay(rld)
@@ -52,8 +52,8 @@ blood_samples=rownames(coldata[coldata$tissue=="blood",])
 ddsm <- get_deseq_time_cond_merged(cts, coldata, blood_samples, 1, 0,"day0_DSS")
 rld <- rlog(ddsm, blind=TRUE)
 #filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time != "2",])
-filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
-rld <- rld[,colnames(rld) %in% filtered_samples]
+#filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
+#rld <- rld[,colnames(rld) %in% filtered_samples]
 meanSdPlot(assay(rld))
 #basic_plots(ddsm, rld, "mouse", "blood", "small")
 resmbs<-NULL
@@ -61,9 +61,9 @@ resmbs <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth,
                                     m_biotypes,"", m_seq,"","day8_DSS","day0_DSS"))
 resmbs2 <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth, pm_orth, 
                                     m_biotypes,"", m_seq,"","day2_DSS","day0_DSS"))
-sig<-return_sig(resmbs, resmbs2, NULL, 0, 0.05, 0.1, miRNAs)
-sig<-return_sig(resmbs, NULL, NULL, 0, 0.05, 0.2, miRNAs)
-heatmap_DE_ts(sig,rld,"mouse","blood","small","miRNAs")
+sig<-return_sig(resmbs, resmbs2, NULL, 0.5, 0.05, 0.1, miRNAs)
+#sig<-return_sig(resmbs, NULL, NULL, 0, 0.05, 0.2, miRNAs)
+heatmap_DE_ts(sig,rld,"mouse","blood","small","miRNAs",2)
 hist(resmbs$pvalue,breaks = 0:20/20)
 boxplot(assay(rld))
 clust<-heatmap_DE_ts_clust(sig,rld,"mouse","blood","small","miRNAs","t8")
@@ -78,7 +78,26 @@ kable(rownames(clust[clust$cluster=="5",]))
 #plotCounts(ddsmbs, gene="mmu-mir-345-5p", intgroup="condition", returnData=TRUE)
 rlog_mouse_blood_small <- assay(rld)
 meanrldbs<-get_mean(rlog_mouse_blood_small, coldata, "mouse", "blood", "small")
-
+filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
+rldbf <- rld[,colnames(rld) %in% filtered_samples]
+sig<-return_sig(resmb, resmb2, NULL, 1 , 0.05, 0.05, protein_coding)
+#heatmap_DE_ts(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
+rld<-rldbf; res<-resmbs
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","small","miRNAs",3, FALSE)
+set.seed(8)
+km<- kmeans(mat,4,iter.max=1000) # determine how many clusters you want, I specify 2 here
+#Show heatmap for all samples, even if clustering was computing on a subset of samples
+rld<-rldb
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+colnames(m.kmeans)[dim(m.kmeans)[2]] <- c("cluster")
+heatmap_DE_kmeans_ts(sig,rld,m.kmeans[,1:18],"mouse","blood","total_protein_coding","Protein coding",4, FALSE)
 
 
 # Pig colon

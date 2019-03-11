@@ -23,6 +23,9 @@ library(GO.db)
 library(dplyr)
 library(tidyr)
 
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("org.Mm.eg.db")
+
 #require("twbattaglia/btools")
 
 #library("installr")
@@ -54,6 +57,8 @@ get_data <- function(counts_file, config_file){
   }
   print(all(rownames(coldata) %in% colnames(cts)))
   cts <- cts[, rownames(coldata)]
+  rownames(coldata)<-coldata$name
+  colnames(cts)<-coldata$name
   print(all(rownames(coldata) == colnames(cts)))
   data <- list(cts, coldata)
   return(data)  
@@ -152,6 +157,23 @@ get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
   return(dds)
 }
 
+get_deseq_ref_D <- function(cts, coldata, sample_list, rowsums, thr){
+  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
+                                colData = coldata[sample_list,],
+                                design = ~ condition)
+  #design = ~ time)
+  print(nrow(dds))
+  dds <- estimateSizeFactors(dds)
+  mnc <- rowMeans(counts(dds, normalized=TRUE))
+  dds <- dds[mnc > 5,]
+  #dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  #dds<-dds[rowSums(counts(dds)) >= thr,] 
+  print(nrow(dds))
+  dds$condition <- relevel(dds$condition, ref = "DSS")
+  dds <- DESeq(dds)
+  print(nrow(dds))
+  return(dds)
+}
 get_deseq_time_cond_merged <- function(cts, coldata, sample_list, rowsums, thr, refcond){
   # A design that takes all blood samples into consideration, by treating all control timepoints,
   # together with day0DSS as control
@@ -194,18 +216,7 @@ get_deseq_time_cond_merged_plus_batch <- function(cts, coldata, sample_list, row
   return(dds)
 }
 
-get_deseq_ref_D <- function(cts, coldata, sample_list, rowsums){
-  dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
-                                colData = coldata[sample_list,],
-                                design = ~ condition)
-  print(nrow(dds))
-  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
-  print(nrow(dds))
-  dds$condition <- relevel(dds$condition, ref = "DSS")
-  dds <- DESeq(dds)
-  print(nrow(dds))
-  return(dds)
-}
+
 
 get_deseq_batch <- function(cts, coldata, sample_list, rowsums,thr){
   dds <- DESeqDataSetFromMatrix(countData = cts[,sample_list],
@@ -277,13 +288,13 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2)
   dev.off()
   #Heatmap
-  select <- order(rowMeans(counts(dds,normalized=TRUE)),
-                  decreasing=TRUE)[1:20]
-  df <- as.data.frame(colData(dds)[,c("condition","time")])
+  #select <- order(rowMeans(counts(dds,normalized=TRUE)),
+   #               decreasing=TRUE)[1:20]
+  #df <- as.data.frame(colData(dds)[,c("condition","time")])
   #df <- as.data.frame(colData(dds)[,c("condition","subject")])
   #print(df)
-  x <- pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
-              cluster_cols=TRUE, annotation_col=df)
+  #x <- pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+   #           cluster_cols=TRUE, annotation_col=df)
   #save_pheatmap_pdf(x, paste("figures/heatmap_", org, "_",tissue,"_",type,".pdf", sep="")) 
   #Samples-distance plot
   sampleDists <- dist(t(assay(vsd)))
@@ -297,22 +308,23 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
               fontsize_row = 20,
               col=colors)
   save_pheatmap_pdf(x, paste("figures/sample_distance_", org, "_",tissue,"_",type,".pdf", sep=""),width=9,height=7) 
+  group="condition"
   if (time==TRUE) {group="time"}
-  else {group="condition"}
   print(group)
   plotPCA(vsd, intgroup=c(group)) +
-    #geom_point(aes(size=25))+
-    aes(label = name) +
-    geom_text_repel()+
-    theme(axis.text=element_text(size=16),axis.title=element_text(size=20,face="bold"),
-          plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))
-  ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=5, height=3.5, dpi = 1000)
-  pdf("figures/PCA_3D.pdf")
-  plotPCA3D(vsd, intgroup = "condition", ntop = 500,
-            returnData = FALSE)
+    aes(label = name)+
+    #geom_label_repel()+
+    geom_text_repel()+#(segment.color = 'transparent')+
+    theme(axis.text=element_text(size=13),axis.title=element_text(size=14,face="bold"),
+          plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))+
+    scale_x_continuous() +
+    scale_y_continuous()+
+    labs(fill="condition")
+  ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=5, height=4, dpi = 1000)
+  #ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".pdf", sep=""))
   dev.off()
   #ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
-}
+  }
 
 get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", biotypes, idname, mir_seq=NULL, timepoint, cond1, cond2,spec){
   now <- as.Date(Sys.time())
@@ -421,6 +433,25 @@ pca_plot <- function(vsd, org, tissue, type){
   plotPCA3D(vsd, intgroup = "condition", ntop = 500,
             returnData = FALSE)
   ggsave(paste("figures/PCA_3D_", org, "_",tissue,"_",type, ".png", sep=""), width=9, height=7, dpi = 100)
+  
+  pcaData <- plotPCA(vsd, intgroup=c("condition"), returnData=TRUE)
+  percentVar <- round(100 * attr(pcaData, "percentVar"))
+  ggplot(pcaData, aes(PC1, PC2, color=condition)) +
+    geom_jitter(aes(size=2)) +
+    #geom_jitter(size=1.5) +
+    xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+    ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+    coord_fixed()+
+    aes(label = name) +
+    #geom_text()+
+    #geom_label_repel()+
+    geom_text_repel()+#segment.color = 'transparent')+
+    theme(axis.text=element_text(size=12),axis.title=element_text(size=12,face="bold"),
+          plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))+
+    labs(fill="condition")
+  ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=5, height=3.5, dpi = 1000)
+  #
+  dev.off()
   
 }
 
@@ -689,11 +720,9 @@ get_stats_pval <- function(common, species1, species2, pthr1,pthr2, lfcthr1, lfc
 
 heatmap_DE_kmeans <- function(sig, rld, mat, org, tissue, type, title, clusters, cluster_rows){
   rows <- match(sig$id, row.names(rld))
-  #mat <- assay(rld)[rows,]
-  #mat <- rld[rows,]
   n=dim(mat)[[1]]
   df <- as.data.frame(colData(rld))
-  df = df[-c(2:7)]
+  df = df[-c(2:8)]
   #breaksList = seq(-2, 2, by = 0.25)
   annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
   x <- pheatmap(mat, 
@@ -703,26 +732,50 @@ heatmap_DE_kmeans <- function(sig, rld, mat, org, tissue, type, title, clusters,
                 cluster_cols =FALSE, 
                 show_rownames=FALSE,
                 method="ward.D",
-                #clustering_distance_rows = "correlation",
                 #show_colnames=FALSE,
+                show_legend=FALSE,
                 annotation_col=df,
                 annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
-                #annotation_legend = FALSE,
                 annotation_names_col = FALSE,
-                #annotation_col=c("DSS","Control"),
                 key.title = "Row-wise Z-score",
                 #breaks = breaksList,
                 border_color = "NA",
-                #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
                 cellwidth=20,
-                main=paste(title,",n=",n,sep=""))
+                main=paste(title,"\nn=",n,sep=""))
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_", org, "_", tissue, "_", type,  ".pdf", sep=""))
-  #,width=9,height=7
-  #clust <- cbind(mat, cluster = cutree(x$tree_row, h=1))#,k = clusters
-  #clust<-as.data.frame(clust)
-  #clust$id <- rownames(clust)
-  #return(clust)
 }
+
+heatmap_DE_kmeans_ts <- function(sig, rld, mat, org, tissue, type, title, clusters, cluster_rows){
+  rows <- match(sig$id, row.names(rld))
+  n=dim(mat)[[1]]
+  df <- as.data.frame(colData(rld))
+  df = df[-c(2,4,5,6,7,8)]
+  #breaksList = seq(-2, 2, by = 0.25)
+  if (org=="mouse"){
+    #time_colors = list(time=c("0"="grey80", "2"="grey50", "8"="grey30"),condition=c(DSS="grey30", Control="grey70"))
+    time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "8"="#6BAED6"),condition=c(DSS="grey30", Control="grey70"))
+  }
+  else{
+    time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "4"="#6BAED6", "5"="#2171B5"),condition=c(DSS="grey30", Control="grey70"))
+  }
+  x <- pheatmap(mat, 
+                scale="none",
+                #cluster_rows=TRUE,
+                cluster_rows=cluster_rows,
+                cluster_cols =FALSE, 
+                show_rownames=FALSE,
+                show_legend=FALSE,
+                annotation_col=df,
+                annotation_colors = time_colors,
+                annotation_names_col = FALSE,
+                key.title = "Row-wise Z-score",
+                #breaks = breaksList,
+                border_color = "NA",
+                cellwidth=20,
+                main=paste(title,"\nn=",n,sep=""))
+  save_pheatmap_pdf(x, paste("figures/heatmap_DE_ts_", org, "_", tissue, "_", type,  ".pdf", sep=""))
+}
+
 
 heatmap_DE <- function(sig, rld, org, tissue, type, title, clusters, cluster_rows){
   rows <- match(sig$id, row.names(rld))
@@ -799,16 +852,13 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title, clusters){
   mat <- assay(rld)[rows,]
   n=dim(mat)[[1]]
   df <- as.data.frame(colData(rld))
-  df = df[-c(2,4,5,6,7)]
-  breaksList = seq(-2, 2, by = 0.25)
+  df = df[-c(2,4,5,6,7,8)]
+  #breaksList = seq(-2, 2, by = 0.25)
   if (org=="mouse"){
     #time_colors = list(time=c("0"="grey80", "2"="grey50", "8"="grey30"),condition=c(DSS="grey30", Control="grey70"))
     time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "8"="#6BAED6"),condition=c(DSS="grey30", Control="grey70"))
   }
   else{
-    #time_colors = list(time=c("0"="grey80", "2"="grey60", "4"="grey40", "5"="grey25"),condition=c(DSS="grey30", Control="grey70"))
-    #time_colors = list(condition=c(DSS="grey30", Control="grey70"))
-    #time_colors = list(time=c("0"="azure", "2"="cadetblue1", "4"="cornflowerblue", "5"="deepskyblue4"),condition=c(DSS="grey30", Control="grey70"))
     time_colors = list(time=c("0"="#EFF3FF", "2"="#BDD7E7", "4"="#6BAED6", "5"="#2171B5"),condition=c(DSS="grey30", Control="grey70"))
     }
   annot_heatmap = c("DSS1","DSS2","DSS3","Control1","Control2","Control3")
@@ -819,18 +869,11 @@ heatmap_DE_ts <- function(sig, rld, org, tissue, type, title, clusters){
                 show_rownames=FALSE,
                 method="single",
                 clustering_distance_rows = "correlation",
-                #show_colnames=FALSE,
                 annotation_col=df,
-                #annotation_colors = list(condition=c(DSS="grey30", Control="grey70")),
                 annotation_colors = time_colors,
-                #annotation_legend = FALSE,
-                #annotation_names_col = FALSE,
-                #annotation_col=c("DSS","Control"),
                 key.title = "Row-wise Z-score",
                 #breaks = breaksList,
                 border_color = "NA",
-                #color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)), 
-                #cellwidth=20,
                 main=paste(title,",n=",n,sep="") )
   save_pheatmap_pdf(x, paste("figures/heatmap_DE_TS_", org, "_",tissue,"_",type,".pdf", sep=""))
   #,width=9,height=7
@@ -1096,14 +1139,18 @@ get_gene_correlations <- function(df1,df2,mmu_pred){
 go_term_enrichment_list <- function(clust, res, padjthr, org, tissue, cluster_no ){
   #res=resmb; padjthr=0.1; cluster_no="1"
   res <- res[complete.cases(res),]
-  assayed.genes <- res$Human.gene.stable.ID
-  de.genes <- res$Human.gene.stable.ID[which(res$id %in% rownames(clust[clust$cluster==cluster_no,]))]
+  #assayed.genes <- res$Human.gene.stable.ID
+  #de.genes <- res$Human.gene.stable.ID[which(res$id %in% rownames(clust[clust$cluster==cluster_no,]))]
+  assayed.genes <- res$id
+  de.genes <- res$id[which(res$id %in% rownames(clust[clust$cluster==cluster_no,]))]
   print(de.genes)
   gene.vector <- as.integer(assayed.genes%in%de.genes)
   names(gene.vector) = assayed.genes
   table(gene.vector)
-  pwf=nullp(gene.vector,"hg19","ensGene") 
-  GO.wall=goseq(pwf,"hg19","ensGene",test.cats=c("GO:MF","GO:BP"))
+  #pwf=nullp(gene.vector,"hg19","ensGene") 
+  #GO.wall=goseq(pwf,"hg19","ensGene",test.cats=c("GO:MF","GO:BP"))
+  pwf=nullp(gene.vector,"mm9","ensGene") 
+  GO.wall=goseq(pwf,"mm9","ensGene",test.cats=c("GO:MF","GO:BP"))
   GO.wall$padj <- p.adjust(GO.wall$over_represented_pvalue,method="BH")
   GOsig <- subset(GO.wall, padj <= padjthr)
   write.table(GOsig[,c(6,8,4,5)], file=paste("results/go_term_enrichment_", org, "_", tissue,"_cluster_",cluster_no, ".tsv", sep=""), sep="\t", row.names = FALSE,quote = FALSE)
@@ -1113,6 +1160,26 @@ go_term_enrichment_list <- function(clust, res, padjthr, org, tissue, cluster_no
   dev.off()
   
   return(GOsig)
+}
+
+library("ggplot2") #Best plots
+library("ggrepel") #Avoid overlapping labels
+draw_volcano <- function(org, tissue, type, res, pthr, lfcthr){
+  yourdataframe=res
+  mutateddf <- mutate(yourdataframe, sig=ifelse(yourdataframe$padj<pthr & abs(yourdataframe$logFC)>lfcthr, "padj<0.05 & logFC>1", "not signif")) #Will have different colors depending on significance
+  input <- cbind(gene=mutateddf$Gene.Name, mutateddf ) #convert the rownames to a column
+  insig <- input[input$padj<0.05,]
+  inup<-head(insig[order(-insig$logFC),],20)
+  indown<-head(insig[order(insig$logFC),],20)
+  inall<-rbind(indown,inup)
+  volc = ggplot(input, aes(logFC, -log10(pvalue))) + #volcanoplot with log2Foldchange versus pvalue
+    geom_point(aes(col=sig),size=0.5) + #add points colored by significance
+    scale_color_manual(values=c("grey", "red")) + 
+    ggtitle(tissue) #e.g. 'Volcanoplot DESeq2'
+  volc+geom_text_repel(data=head(inall, 40), aes(label=gene), size=2.5, segment.color = NA) #adding text for the top 20 genes
+  #+geom_text_repel(data=head(indown, 10), aes(label=gene)) #adding text for the top 20 genes
+  ggsave(paste("figures/Volcanoplot_",org, "_", tissue,"_",type,".jpeg",sep=""), device="jpeg") #In case you want to easily save to disk
+  volc
 }
 
 

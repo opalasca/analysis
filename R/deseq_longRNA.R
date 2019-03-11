@@ -50,43 +50,46 @@ tpm_pig$id<-rownames(tpm_pig)
 hist(tpm_pig$PC20)
 
 
-data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
+data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse_rename.txt")
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
-coldata<-coldata[order(coldata$condition,coldata$time),]
+coldata<-coldata[order(-coldata$condition,coldata$time),]
 dim(cts)
 cts<-cts[rownames(cts) %in% mouse_genes_to_keep$id,]
 dim(cts)
 colon_samples=rownames(coldata[coldata$tissue=="colon",])
+rownames(coldata)=coldata$name
 #ddsm <- get_deseq_ref_D(cts, coldata, colon_samples, 3)
 ddsm<-NULL
 ddsm <- get_deseq(cts, coldata, colon_samples, 1, 0)
 vsd <- vst(ddsm, blind=FALSE) ##
 rldc <- rlog(ddsm, blind=TRUE)
-#basic_plots(ddsm, rldc, "mouse", "colon","total",FALSE)
+ddsmrefD <- get_deseq_ref_D(cts, coldata, colon_samples, 1, 0)
+rldcrefD <- rlog(ddsmrefD, blind=TRUE)
+basic_plots(ddsmrefD, rldcrefD, "mouse", "colon","total",FALSE)
 resmc<-NULL
 resmc <- as.data.frame(get_results(ddsm, "mouse", "colon", "total", 1, mh_orth, mp_orth, m_biotypes, m_names, NULL,"",NULL,NULL,""))
 resold <- read.csv("/Users/jmx139/Dropbox/AniGen/BGI_analysis/results/4&10&11-01-2019/mouse_colon_total_1_thr.tsv", header=TRUE, sep="\t")
 resold$logFCdiff = resold$logFC - resmc$logFC
 resold$pdiff = resold$padj - resmc$padj
 ddsmc<-ddsm
-sig<-return_sig(resmc, NULL, NULL, 1, 0.05, 0.05, protein_coding)
 #heatmap_DE(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes")
 #heatmap_DE(sig,rldc,"mouse","colon","total_protein_coding","Protein coding genes","")
 #heatmap_DE(siglncc,rldc,"mouse","colon","total_lncRNA","LncRNAs","")
-rlog_mouse_colon_total <- assay(rldc)
-tpm_mouse_colon<-tpm_mouse[rownames(tpm_mouse) %in% rownames(rlog_mouse_colon_total),]
-meanrldc<-get_mean(rlog_mouse_colon_total,coldata,"mouse", "colon", "total")
-meantpmc<-get_mean(tpm_mouse_colon, coldata, "mouse", "colon", "total")
+#rlog_mouse_colon_total <- assay(rldc)
+#tpm_mouse_colon<-tpm_mouse[rownames(tpm_mouse) %in% rownames(rlog_mouse_colon_total),]
+#meanrldc<-get_mean(rlog_mouse_colon_total,coldata,"mouse", "colon", "total")
+#meantpmc<-get_mean(tpm_mouse_colon, coldata, "mouse", "colon", "total")
 #clust<-heatmap_DE(sig,rldc,"mouse","colon","total_protein_coding","Protein coding genes",2)
 #go_clust1 <- go_term_enrichment_list(clust,resmc,0.1,"mouse","colon","1")
 #go_clust2 <- go_term_enrichment_list(clust,resmc,0.1,"mouse","colon","2")
+sig<-return_sig(resmc, NULL, NULL, 1, 0.05, 0.05, protein_coding)
 rld<-rldc
 res<-resmc
 rows <- match(sig$id, row.names(rld))
 mat <- assay(rld)[rows,]
 mat<-t(scale(t(mat)))
-heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","total_protein_coding","Protein coding genes",4, FALSE)
+#heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","total_protein_coding","Protein coding genes",4, FALSE)
 #set.seed(42)
 set.seed(7)
 km<- kmeans(mat,3,iter.max = 1000) # determin how many cluster you want, I specify 2 here
@@ -95,13 +98,13 @@ dim(m.kmeans)[2]
 o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
 m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
 colnames(m.kmeans)[7] <- c("cluster")
-heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","colon","total_protein_coding","Protein coding genes",4, FALSE)
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","colon","total_protein_coding","Protein coding",4, FALSE)
 clust<-as.data.frame(m.kmeans)
 clust_counts <- as.data.frame(clust[,c("cluster")])
 clust_counts <- aggregate(list(cluster=rep(1,nrow(clust_counts))), clust_counts, length)
 clust_counts
 colnames(m.kmeans)[7] <- c("cluster")
-heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","colon","total_protein_coding","Protein coding genes",4, FALSE)
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","colon","total_protein_coding","Protein coding",4, FALSE)
 clust<-as.data.frame(m.kmeans)
 clust_counts <- as.data.frame(clust[,c("cluster")])
 clust_counts <- aggregate(list(cluster=rep(1,nrow(clust_counts))), clust_counts, length)
@@ -110,44 +113,98 @@ tclust<-clust
 tclust$id <- rownames(tclust)
 tclust<-tclust[,c("id","cluster")]
 write.table(tclust, file=paste("results/expression_clusters_", "mouse", "_", "colon", "_", as.Date(Sys.time()), ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
-go_clust1 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","1")
-go_clust2 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","2")
-go_clust3 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","3")
-go_clust4 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","4")
-go_clust5 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","5")
-sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="1",]),]
-heatmap_DE(sig_clust,rldc,"mouse","colon","total_protein_coding","Protein coding genes",2, TRUE)
+go_clust1 <- go_term_enrichment_list(clust,res,0.5,"mouse","colon","1")
+go_clust2 <- go_term_enrichment_list(clust,res,0.5,"mouse","colon","2")
+go_clust3 <- go_term_enrichment_list(clust,res,0.5,"mouse","colon","3")
+#go_clust4 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","4")
+#go_clust5 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","5")
+#sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="1",]),]
+#heatmap_DE(sig_clust,rldc,"mouse","colon","total_protein_coding","Protein coding genes",2, TRUE)
+sig<-return_sig(resmc, NULL, NULL, 1, 0.05, 0.05, lncRNAs)
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+#heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","total_protein_coding","Protein coding genes",3, FALSE)
+set.seed(10)
+#set.seed(16)
+km<- kmeans(mat,3,iter.max=1000) # determin how many cluster you want, I specify 2 here
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+dim(m.kmeans)[2]
+o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+m.kmeans<-as.data.frame(m.kmeans)
+colnames(m.kmeans)[7] <- c("cluster")
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","colon","total_lncRNA","LncRNAs",4, FALSE)
+clust<-as.data.frame(m.kmeans)
+clust_counts <- as.data.frame(clust[,c("cluster")])
+clust_counts <- aggregate(list(cluster=rep(1,nrow(clust_counts))), clust_counts, length)
+write.table(tclust, file=paste("results/expression_clusters_", "mouse", "_", "colon", "_", as.Date(Sys.time()), ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+go_clust1 <- go_term_enrichment_list(clust,res,0.5,"mouse","colon","1")
+go_clust2 <- go_term_enrichment_list(clust,res,0.5,"mouse","colon","2")
+go_clust3 <- go_term_enrichment_list(clust,res,0.5,"mouse","colon","3")
+draw_volcano("mouse","colon", "total",resmc, 0.05, 1)
+
+
+
+
+
+
+
 
 # Mouse blood all samples #
 ###########################
-data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse.txt")
-#data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
+data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse_rename.txt")
+#data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse.txt")
 cts<-data[[1]]; coldata<-data[[2]]
 coldata<-coldata[order(coldata$condition,coldata$time),]
 cts<-cts[rownames(cts) %in% mouse_genes_to_keep$id,]
 blood_samples=rownames(coldata[coldata$tissue=="blood",])
-#ddsm <- get_deseq(cts, coldata, blood_samples, 1, 0)
 ddsm <- get_deseq_time_cond_merged(cts, coldata, blood_samples, 1, 0,"day0_DSS")
 vsd <- vst(ddsm, blind=FALSE) ##rld <- rlog(dds, blind=FALSE); ntd <- normTransform(dds)
 rldb <- rlog(ddsm, blind=TRUE)
-#filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time != "2",])
-filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
-rldb <- rldb[,colnames(rldb) %in% filtered_samples]
-#meanSdPlot(assay(vsd))
-#basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
+
+basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
 resmb<-NULL
 resmb <- as.data.frame(get_results(ddsm, "mouse", "blood", "total", 1, mh_orth, mp_orth, 
                                    m_biotypes, m_names, NULL,"","day8_DSS","day0_DSS","day8DSS_vs_all_ctrl_timepoints"))
 resmb2 <- as.data.frame(get_results(ddsm, "mouse", "blood", "total", 1, mh_orth, mp_orth, 
                                    m_biotypes, m_names, NULL,"","day2_DSS","day0_DSS","day2DSS_vs_all_ctrl_timepoints"))
 ddsmb <- ddsm
-boxplot(assay(rldb))
-#sig<-return_sig(resmb,NULL, NULL, 1 , 0.05, 0.05, protein_coding)
-res<-resmb[abs(resmb$logFC)>=1 & resmb$padj<=0.05,]
-
+#Compute clustering on a subset of samples only - e.g. DSS samples 
+#filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time != "8",])
+filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
+rldbf <- rldb[,colnames(rldb) %in% filtered_samples]
 sig<-return_sig(resmb, resmb2, NULL, 1 , 0.05, 0.05, protein_coding)
-#sig<-return_sig(resmb, NULL, NULL, 1 , 0.05, 0.1, protein_coding)
-heatmap_DE_ts(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
+#heatmap_DE_ts(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
+rld<-rldbf; res<-resmb
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","total_protein_coding","Protein coding genes",3, FALSE)
+set.seed(8)
+km<- kmeans(mat,4,iter.max=1000) # determine how many clusters you want, I specify 2 here
+#Show heatmap for all samples, even if clustering was computing on a subset of samples
+rld<-rldb
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+colnames(m.kmeans)[dim(m.kmeans)[2]] <- c("cluster")
+heatmap_DE_kmeans_ts(sig,rld,m.kmeans[,1:18],"mouse","blood","total_protein_coding","Protein coding",4, FALSE)
+clust<-as.data.frame(m.kmeans)
+clust_counts <- as.data.frame(clust[,c("cluster")])
+clust_counts <- aggregate(list(cluster=rep(1,nrow(clust_counts))), clust_counts, length)
+clust_counts
+tclust<-clust
+tclust$id <- rownames(tclust)
+tclust<-tclust[,c("id","cluster")]
+write.table(tclust, file=paste("results/expression_clusters_", "mouse", "_", "blood", "_", as.Date(Sys.time()), ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+go_clust1 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","1")
+go_clust2 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","2")
+go_clust3 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","3")
+go_clust4 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","4")
+
 sig<-return_sig(resmb, resmb2, NULL, 1, 0.05, 0.1, lncRNAs)
 heatmap_DE_ts(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs",2)
 #hist(resmb$pvalue,breaks = 0:20/20)
@@ -155,35 +212,33 @@ rlog_mouse_blood_total <- assay(rldb)
 tpm_mouse_blood<-tpm_mouse[rownames(tpm_mouse) %in% rownames(rlog_mouse_blood_total),]
 meanrldb<-get_mean(rlog_mouse_blood_total,coldata,"mouse", "blood", "total")
 meantpmb<-get_mean(tpm_mouse_blood,coldata,"mouse", "blood", "total")
-#hist(meantpmb$DSS_day8)
-
-#sig<-return_sig(resmb2, NULL, NULL, 1, 0.05, 0.5, protein_coding)
-#sig<-return_sig(resmb, resmb2, NULL, 1 , 0.05, 0.1, pc_lnc)
-sig<-merge(sig, mnames, by.x='id', by.y='Gene.stable.ID')
-clust<-heatmap_DE_ts(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes",4)
-
-clust_counts <- as.data.frame(clust[,c("cluster")])
-clust_counts <- aggregate(list(cluster=rep(1,nrow(clust_counts))), clust_counts, length)
-clust_counts
-go_clust1 <- go_term_enrichment_list(clust,resmb,0.5,"mouse","blood","1")
-go_clust2 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","2")
-go_clust3 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","3")
-go_clust4 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","4")
-go_clust6 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","6")
-go_clust8 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","8")
-go_clust9 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","9")
-go_clust11 <- go_term_enrichment_list(clust,resmb,0.1,"mouse","blood","11")
-sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="2",]),]
-heatmap_DE_ts_rownames(sig_clust,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
-subclust<-heatmap_DE_ts(sig_clust,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
-go_subclust1 <- go_term_enrichment_list(subclust,resmb,0.1,"mouse","blood","1")
-go_subclust2 <- go_term_enrichment_list(subclust,resmb,0.1,"mouse","blood","2")
-
-sig_clust <- sig[sig$id %in% rownames(subclust[subclust$cluster=="2",]),]
-heatmap_DE_ts_rownames(sig_clust,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
+#sig<-merge(sig, mnames, by.x='id', by.y='Gene.stable.ID')
+#sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="2",]),]
+#heatmap_DE_ts_rownames(sig_clust,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
+#mouse_blood_cluster_M72 <- sig[sig$id %in% rownames(clust[clust$cluster=="8",]),]
+sig<-return_sig(resmb, resmb2, NULL, 1, 0.05, 0.05, lncRNAs)
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+#heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","total_protein_coding","Protein coding genes",3, FALSE)
+set.seed(10)
+#set.seed(16)
+km<- kmeans(mat,4,iter.max=1000) # determin how many cluster you want, I specify 2 here
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+dim(m.kmeans)[2]
+o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+m.kmeans<-as.data.frame(m.kmeans)
+colnames(m.kmeans)[7] <- c("cluster")
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","blood","total_lncRNA","LncRNAs",4, FALSE)
+m.kmeans[m.kmeans$cluster==1,]$cluster=33
+#m.kmeans[m.kmeans$cluster==3,]$cluster=22
+o<- order(m.kmeans$cluster) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","blood","total_lncRNA","LncRNAs",4, FALSE)
 
 
-mouse_blood_cluster_M72 <- sig[sig$id %in% rownames(clust[clust$cluster=="8",]),]
+
 
 # Pig colon #
 #############
@@ -283,41 +338,7 @@ go_clust8 <- go_term_enrichment_list(clust,respb,0.1,"pig","blood","8")
 #Draw heatmap of the desired cluster
 sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="5",]),]
 heatmap_DE_ts(sig_clust,rldb,"pig","blood","total_protein_coding","Protein coding genes",2)
-
-
-draw_volcano <- function(org, type, res, pthr, lfcthr){
-  pthr <- 0.05 # Threshold on the adjusted p-value
-  org="pig";type="total"; res=respb;lfcthr=10
-  cols <- densCols(res$logFC, -log10(res$padj))
-  pdf(file=paste("volcano_",org,"_",type,".pdf",sep='')) 
-  plot(res$logFC, -log10(res$padj), col=cols, panel.first=grid(),
-       main=paste(org,"_",type,sep=''), xlab="log2(fold-change)", ylab="-log10(adj.p-value)",
-       pch=20, cex=0.6)
-  abline(v=0)
-  abline(v=c(-1,1), col="brown")
-  abline(h=-log10(pthr), col="brown")
-  selected <- abs(res$logFC) > lfcthr & res$padj < pthr 
-  if (selected){
-    text(res$logFC[selected],-log10(res$padj)[selected],
-         lab=res$Gene.Name[selected], cex=0.4)
-  }
-  dev.off()
-}
-
-draw_volcano("pig","total",respb,0.01,2)
-
-library("ggplot2") #Best plots
-library("ggrepel") #Avoid overlapping labels
-yourdataframe=resmb
-mutateddf <- mutate(yourdataframe, sig=ifelse(yourdataframe$padj<0.1 & abs(yourdataframe$logFC)>1, "padj<0.1", "Not Sig")) #Will have different colors depending on significance
-input <- cbind(gene=mutateddf$Gene.Name, mutateddf ) #convert the rownames to a column
-volc = ggplot(input, aes(logFC, -log10(pvalue))) + #volcanoplot with log2Foldchange versus pvalue
-  geom_point(aes(col=sig)) + #add points colored by significance
-  scale_color_manual(values=c("black", "red")) + 
-  ggtitle("Blood") #e.g. 'Volcanoplot DESeq2'
-volc+geom_text_repel(data=head(input, 50), aes(label=gene)) #adding text for the top 20 genes
-ggsave("figures/Volcanoplot_blood.jpeg", device="jpeg") #In case you want to easily save to disk
-volc
+draw_volcano("mouse","blood", "total",resmb, 0.05, 1)
 
 
 
@@ -358,7 +379,7 @@ dim(siglncb[siglncb$logFC<1,])
 data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse.txt")
 #data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
 cts<-data[[1]]; coldata<-data[[2]]
-coldata<-coldata[order(coldata$condition,coldata$time),]
+coldata<-coldata[order(-coldata$condition,coldata$time),]
 cts<-cts[rownames(cts) %in% mouse_genes_to_keep$id,]
 blood_samples=rownames(coldata[(coldata$time=="8") & coldata$tissue=="blood",])
 ddsm <- get_deseq(cts, coldata, blood_samples, 1, 0)
@@ -368,6 +389,7 @@ meanSdPlot(assay(vsd))
 resmb<-NULL
 resmb <- get_results(ddsm, "mouse", "blood","total", 1, mh_orth, mp_orth, m_biotypes,m_names, NULL,"",NULL,NULL,"_day8")
 ddsmb <- ddsm
+basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
 #res<-resmb[abs(resmb$logFC)>=1 & resmb$padj<=0.05,]
 boxplot(assay(rldb))
 res<-resmb
@@ -404,7 +426,6 @@ go_clust3 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","3")
 go_clust4 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","4")
 sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="3",]),]
 heatmap_DE(sig_clust,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2, TRUE)
-#basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
 
 #sig<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.1, lncRNAs)
 #heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs",2)
@@ -434,4 +455,88 @@ sigpc <- res[abs(res$logFC)>lfcthr & res$padj<pthr & res$biotype=="protein_codin
 heatmap_DE_ts(sigpc,rldb,"mouse","blood","total_protein_coding","Protein coding")
 heatmap_DE_ts(siglnc,rldb,"mouse","blood","total_lncRNA","LncRNAs")
 hist(resmb8$pvalue)
+
+
+#Mouse blood day 8 DSS vs controls
+data<-get_data("data/gene_count_matrix_mouse_annot_reseq.csv", "data/config_mouse_rename_day8.txt")
+#data<-get_data("data/gene_count_matrix_mouse_annot.csv", "data/config_mouse.txt")
+cts<-data[[1]]; coldata<-data[[2]]
+coldata<-coldata[order(-coldata$condition,coldata$time),]
+cts<-cts[rownames(cts) %in% mouse_genes_to_keep$id,]
+blood_samples=rownames(coldata[(coldata$time=="8") & coldata$tissue=="blood",])
+ddsm <- get_deseq(cts, coldata, blood_samples, 1, 0)
+vsd <- vst(ddsm, blind=FALSE) ##rld <- rlog(dds, blind=FALSE); ntd <- normTransform(dds)
+rldb <- rlog(ddsm, blind=TRUE)
+meanSdPlot(assay(vsd))
+resmb<-NULL
+resmb <- get_results(ddsm, "mouse", "blood","total", 1, mh_orth, mp_orth, m_biotypes,m_names, NULL,"",NULL,NULL,"_day8")
+ddsmb <- ddsm
+ddsmrefD <- get_deseq_ref_D(cts, coldata, blood_samples, 1, 0)
+rldbrefD <- rlog(ddsmrefD, blind=TRUE)
+basic_plots(ddsmrefD, rldbrefD, "mouse", "blood","total",FALSE)
+#basic_plots(ddsm, rldb, "mouse", "blood", "total",FALSE)
+boxplot(assay(rldb))
+res<-resmb
+sig<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.05, protein_coding)
+#clust<-heatmap_DE(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes",4, TRUE)
+#heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs",2, TRUE)
+sig<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.05, protein_coding)
+rld<-rldb; res<-resmb
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","total_protein_coding","Protein coding genes",3, FALSE)
+set.seed(1)
+km<- kmeans(mat,3,iter.max=1000) # determin how many cluster you want, I specify 2 here
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+dim(m.kmeans)[2]
+o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+colnames(m.kmeans)[7] <- c("cluster")
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","blood","total_protein_coding","Protein coding",4, FALSE)
+m.kmeans<-as.data.frame(m.kmeans)
+#m.kmeans[m.kmeans$cluster==1,]$cluster=33
+m.kmeans[m.kmeans$cluster==2,]$cluster=33
+#m.kmeans[m.kmeans$cluster==3,]$cluster=11
+o<- order(m.kmeans$cluster) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","blood","total_protein_coding","Protein coding",4, FALSE)
+clust<-as.data.frame(m.kmeans)
+clust_counts <- as.data.frame(clust[,c("cluster")])
+clust_counts <- aggregate(list(cluster=rep(1,nrow(clust_counts))), clust_counts, length)
+clust_counts
+tclust<-clust
+tclust$id <- rownames(tclust)
+tclust<-tclust[,c("id","cluster")]
+write.table(tclust, file=paste("results/expression_clusters_", "mouse", "_", "blood", "_", as.Date(Sys.time()), ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+go_clust1 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","1")
+go_clust2 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","2")
+go_clust3 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","3")
+#go_clust4 <- go_term_enrichment_list(clust,res,0.1,"mouse","blood","4")
+#sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="3",]),]
+#heatmap_DE(sig_clust,rldb,"mouse","blood","total_protein_coding","Protein coding",2, TRUE)
+#sig<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.1, lncRNAs)
+#heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs",2)
+sig<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.05, lncRNAs)
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+#heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","total_protein_coding","Protein coding genes",3, FALSE)
+set.seed(10)
+#set.seed(16)
+km<- kmeans(mat,3,iter.max=1000) # determin how many cluster you want, I specify 2 here
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+dim(m.kmeans)[2]
+o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+m.kmeans<-as.data.frame(m.kmeans)
+colnames(m.kmeans)[7] <- c("cluster")
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","blood","total_lncRNA","LncRNAs",4, FALSE)
+m.kmeans[m.kmeans$cluster==1,]$cluster=33
+#m.kmeans[m.kmeans$cluster==3,]$cluster=22
+o<- order(m.kmeans$cluster) # order the last column
+m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","blood","total_lncRNA","LncRNAs",4, FALSE)
+
+
 

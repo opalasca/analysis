@@ -17,12 +17,12 @@ res2<-resmc
 res3<-resmb
 common_mcbt <- data.frame()
 common_mcbt <- as.data.frame(merge(res2, res3, by.x='id', by.y='id'))
-common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
+#common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
 common_mcbt <- common_mcbt[(common_mcbt$biotype.x %in% lncRNAs),]
 pthr=0.05; thr=1
-mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
+#mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
 mp<-get_stats_v2(common_mcbt, res2, res3, protein_coding, "colon", "blood", pthr, pthr, thr, thr, 0)
-mp[[1]]
+kable(mp[[1]])
 cons_mcbt<-mp[[2]]
 dim(cons_mcbt[cons_mcbt$logFC.x<1,])
 cons_lnc <- cons_mcbt[cons_mcbt$biotype.x %in% lncRNAs,]
@@ -39,7 +39,7 @@ common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
 #common_mcbt <- common_mcbt[(common_mcbt$biotype.x %in% lncRNAs),]
 pthr=0.1; thr=1
 mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
-mp[[1]]
+kable(mp[[1]])
 cons_mcbt<-mp[[2]]
 
 library(knitr) 
