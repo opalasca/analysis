@@ -14,21 +14,23 @@ curated_mirs_blood$partial_id=tolower(curated_mirs_blood$partial_id)
 #Mouse colon vs blood total
 res2<-resmc
 #res3<-resmb8
-res3<-resmb
+res3<-resmb8
 common_mcbt <- data.frame()
 common_mcbt <- as.data.frame(merge(res2, res3, by.x='id', by.y='id'))
-#common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
-common_mcbt <- common_mcbt[(common_mcbt$biotype.x %in% lncRNAs),]
-pthr=0.05; thr=1
+common_mcbt <- common_mcbt[(common_mcbt$biotype.x=="protein_coding"),]
+#common_mcbt <- common_mcbt[(common_mcbt$biotype.x %in% lncRNAs),]
+pthr=0.05; thr=1.5
 #mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
 mp<-get_stats_v2(common_mcbt, res2, res3, protein_coding, "colon", "blood", pthr, pthr, thr, thr, 0)
 kable(mp[[1]])
 cons_mcbt<-mp[[2]]
+cons_macbt_day8 <- cons_mcbt
+c<-merge(cons_mcbt,cons_macbt_day8, by="id",all=TRUE)
+
 dim(cons_mcbt[cons_mcbt$logFC.x<1,])
 cons_lnc <- cons_mcbt[cons_mcbt$biotype.x %in% lncRNAs,]
 cons_pc <- cons_mcbt[cons_mcbt$biotype.x=="protein_coding",]
 res2_pc <- res2[res2$biotype=="protein_coding" & abs(res2$logFC)>1 & res2$padj<0.05,]
-
 
 #Pig colon vs blood total
 res2<-respc
@@ -41,6 +43,22 @@ pthr=0.1; thr=1
 mp<-get_stats(common_mcbt,  "colon", "blood", pthr, pthr, thr, thr, 0)
 kable(mp[[1]])
 cons_mcbt<-mp[[2]]
+
+#Mouse blood total vs human blood GSE112057
+res2<-resmb
+res3<-resUC
+common_mcbt <- as.data.frame(merge(res2, res3, by.x='Human.gene.name', by.y='name'))
+pthr=0.1; thr=0.5
+mp<-get_stats(common_mcbt,  "mouse", "human", pthr, pthr, thr, thr, 0)
+kable(mp[[1]])
+cons_mcbt<-mp[[2]]
+
+cons_mcbt8<-cons_mcbt
+c<-merge(cons_mcbt,cons_mcbt8,by="Human.gene.name")
+
+res2<-resUC
+res3<-resCD
+common_mcbt <- as.data.frame(merge(res2, res3, by.x='name', by.y='name'))
 
 library(knitr) 
 mph<-kable(mp[[1]], format = "html")
@@ -76,6 +94,8 @@ pthr=0.1; thr=1
 mp<-get_stats(common_mcbt,  "mouse", "human", pthr, pthr, thr, thr, 0)
 kable(mp[[1]])
 cons_mcbt<-mp[[2]]
+
+
 
 #Mouse colon vs human UC colon GSE48957
 res2<-resmcs
@@ -156,12 +176,12 @@ cons_mpb<-mp[[2]]
 
 
 
-pthr=0.1; thr=0
+pthr=0.1; thr=0.5
 #Mouse blood small vs human UC blood GSE32273
 res1<-resmbs
-#res2<-UCpl_vs_Cpl_merged
+res2<-UCpl_vs_Cpl_merged
 #res2<-UCP_vs_CP_merged
-res2<-UCm_vs_Cm_merged
+#res2<-UCm_vs_Cm_merged
 names(res2)[10]="seq"
 res2$seq=toupper(res2$seq)
 res2$seq<-gsub("T", "U", res2$seq)

@@ -42,18 +42,30 @@ rlog_small<-rlog_small[rownames(rlog_small) %in% resmir[resmir$avg.expr>30,]$id,
 rlog_total<-rlog_total[rownames(rlog_total) %in% resg[resg$avg.expr>30,]$id,]
 
 de_mirs <- return_sig_no_biotype(resmir, NULL, NULL, 0, 0.2, 1)
+
+clust_mirs <- blood_M72_small
+de_mirs <- resmir[resmir$id %in% rownames(m.kmeans[m.kmeans$cluster=="1",]), ]
+de_mirs <- de_mirs[de_mirs$avg.expr > 100,]
+de_mirs_rain <- merge(de_mirs, mmu_rain, by.x="id", by.y="miRNA" )
+de_mirs_rain <- de_mirs_rain[de_mirs_rain$score>0.15,]
+pred_targets_clust <- unique(de_mirs_rain[,c("Gene.stable.ID")]) 
+ptc<- as.data.frame(pred_targets_clust)
+mbt <- mouse_blood_total_all_clust
+mbt$id <- rownames(mbt)
+overlap <- merge(mbt,ptc,by.x="id",by.y="pred_targets_clust" )
+
 correl_all <- get_gene_correlations(rlog_small,rlog_total)
 correl_risearch <- merge(correl_all, mmu_risearch, by.x=c("gene","miRNA"),by.y=c("gene","mirna"))
 correl_risearch_DE <- correl_risearch[correl_risearch$miRNA %in% de_mirs$id, ]
 hist(correl_risearch_DE$corr)
 
-logFCthr=1
+logFCthr=0.1; logFCthrmir=0.5;
 de_genes <- return_sig_no_biotype(resg, NULL, NULL, 0, 0.1, 0.1)
 de_genes_up <-de_genes[de_genes$logFC > logFCthr,]
 de_genes_down <-de_genes[de_genes$logFC < -logFCthr,]
-de_mirs <- return_sig_no_biotype(resmir, NULL, NULL, 0, 0.1, 0.4)
-de_mirs_up <-de_mirs[de_mirs$logFC > logFCthr,]
-de_mirs_down <-de_mirs[de_mirs$logFC < - logFCthr,]
+de_mirs <- return_sig_no_biotype(resmir, NULL, NULL, 0, 0.05, 0.3)
+de_mirs_up <- de_mirs[de_mirs$logFC > logFCthrmir,]
+de_mirs_down <-de_mirs[de_mirs$logFC < - logFCthrmir,]
 
 pred_targets <- unique(mmu_rain[,c("Gene.stable.ID")]) 
 pred_mirs <- unique(mmu_rain[,c("miRNA")])
@@ -84,11 +96,11 @@ pred_opposite <- dim(correl_targets_DE[!is.na(correl_targets_DE$score) &
         ((correl_targets_DE$miRNA %in% de_mirs_up$id & correl_targets_DE$gene %in% de_genes_down$id) | 
           (correl_targets_DE$miRNA %in% de_mirs_down$id & correl_targets_DE$gene %in% de_genes_up$id)),] )[1]
 not_pred_same_way <- dim(correl_targets_DE[is.na(correl_targets_DE$score) & 
-                                         ((correl_targets_DE$miRNA %in% de_mirs_up$id & correl_targets_DE$gene %in% de_genes_up$id) | 
-                                            (correl_targets_DE$miRNA %in% de_mirs_down$id & correl_targets_DE$gene %in% de_genes_down$id)),] )[1]
+          ((correl_targets_DE$miRNA %in% de_mirs_up$id & correl_targets_DE$gene %in% de_genes_up$id) | 
+          (correl_targets_DE$miRNA %in% de_mirs_down$id & correl_targets_DE$gene %in% de_genes_down$id)),] )[1]
 not_pred_opposite <- dim(correl_targets_DE[is.na(correl_targets_DE$score) & 
-                                         ((correl_targets_DE$miRNA %in% de_mirs_up$id & correl_targets_DE$gene %in% de_genes_down$id) | 
-                                            (correl_targets_DE$miRNA %in% de_mirs_down$id & correl_targets_DE$gene %in% de_genes_up$id)),] )[1]
+          ((correl_targets_DE$miRNA %in% de_mirs_up$id & correl_targets_DE$gene %in% de_genes_down$id) | 
+          (correl_targets_DE$miRNA %in% de_mirs_down$id & correl_targets_DE$gene %in% de_genes_up$id)),] )[1]
 
 m <- matrix(c(pred_same_way,pred_opposite,not_pred_same_way,not_pred_opposite), nrow=2)
 colnames(m) <- c("pred target","not pred target")

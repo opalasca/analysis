@@ -28,77 +28,87 @@ coldata<-coldata[order(coldata$condition,coldata$time),]
 colon_samples=rownames(coldata[coldata$tissue=="colon",]) 
 ddsm <- get_deseq(cts, coldata, colon_samples, 1, 0)
 #vsd <- varianceStabilizingTransformation(ddsm, blind=TRUE)
-rld <- rlog(ddsm, blind=TRUE)
+rldc <- rlog(ddsm, blind=TRUE)
 meanSdPlot(assay(rld))
-rld <- rld[,colnames]
-#basic_plots(ddsm, rld, "mouse", "colon","small")
+#rld <- rld[,colnames]
+basic_plots(ddsm, rldc, "mouse", "colon","small")
 resmcs<-NULL
 resmcs <- as.data.frame(get_results(ddsm, "mouse", "colon", "small", 1, mh_orth, pm_orth, m_biotypes,"", m_seq, "", NULL, NULL))
 ddsmcs<-ddsm
 hist(resmcs$pvalue)
-sig<-return_sig(resmcs, NULL, NULL, 0.5, 0.1, 0.1, miRNAs)
-clust<-heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs",2)
-heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs",2)
-rlog_mouse_colon_small <- assay(rld)
+rlog_mouse_colon_small <- assay(rldc)
 meanrldcs<-get_mean(rlog_mouse_colon_small, coldata, "mouse", "colon", "small")
+draw_volcano("mouse","colon", "small",resmcs, 0.1, 1,"")
+sig<-return_sig(resmcs, NULL, NULL, 0.5, 0.05, 0.1, miRNAs)
+rld<-rldc; res<-resmcs
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+#heatmap_DE_kmeans(sig,rld, mat,"mouse","colon","small","miRNAs",3, FALSE)
+set.seed(8)
+km<- kmeans(mat,3,iter.max=1000) # determine how many clusters you want, I specify 2 here
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+o <- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans <- m.kmeans[o,] # order the matrix according to the order of the last column
+colnames(m.kmeans)[dim(m.kmeans)[2]] <- c("cluster")
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","colon","small","miRNAs",3, FALSE)
+m.kmeans<-as.data.frame(m.kmeans)
+kable(rownames(m.kmeans[m.kmeans$cluster=="1",]))
+#plotCounts(ddsmbs, gene="mmu-mir-345-5p", intgroup="condition", returnData=TRUE)
+#heatmap_DE_rownames(sig,rld,"mouse","colon","small","miRNAs","day8", 2)
+
 
 
 # Mouse blood, all samples (timepoint and condition combined and all controls considered as DSS day 0
-data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546186982.csv", "data/config_mouse.txt", 24, m_selected)
+data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546186982.csv", "data/config_mouse_rename.txt", 24, m_selected)
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
 coldata<-coldata[order(coldata$condition,coldata$time),]
 blood_samples=rownames(coldata[coldata$tissue=="blood",])
 ddsm <- get_deseq_time_cond_merged(cts, coldata, blood_samples, 1, 0,"day0_DSS")
-rld <- rlog(ddsm, blind=TRUE)
+rldb <- rlog(ddsm, blind=TRUE)
 #filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" & coldata$time != "2",])
 #filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
 #rld <- rld[,colnames(rld) %in% filtered_samples]
-meanSdPlot(assay(rld))
-#basic_plots(ddsm, rld, "mouse", "blood", "small")
+meanSdPlot(assay(rldb))
+basic_plots(ddsm, rldb, "mouse", "blood", "small",TRUE)
 resmbs<-NULL
 resmbs <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth, pm_orth, 
-                                    m_biotypes,"", m_seq,"","day8_DSS","day0_DSS"))
+                                    m_biotypes,"", m_seq,"","day8_DSS","Control"))
 resmbs2 <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth, pm_orth, 
-                                    m_biotypes,"", m_seq,"","day2_DSS","day0_DSS"))
-sig<-return_sig(resmbs, resmbs2, NULL, 0.5, 0.05, 0.1, miRNAs)
-#sig<-return_sig(resmbs, NULL, NULL, 0, 0.05, 0.2, miRNAs)
-heatmap_DE_ts(sig,rld,"mouse","blood","small","miRNAs",2)
+                                    m_biotypes,"", m_seq,"","day2_DSS","Control"))
+#sig<-return_sig(resmbs, resmbs2, NULL, 0.5, 0.05, 0.1, miRNAs)
+sig<-return_sig(resmbs, NULL, NULL, 0, 0.05, 0.3, miRNAs)
+#set.seed(9)
+draw_volcano("mouse","blood", "small",resmbs, 0.1, 1,"Day8_vs_control")
+draw_volcano("mouse","blood", "small",resmbs2, 0.1, 1,"Day2_vs_control")
 hist(resmbs$pvalue,breaks = 0:20/20)
-boxplot(assay(rld))
-clust<-heatmap_DE_ts_clust(sig,rld,"mouse","blood","small","miRNAs","t8")
-#hist(resmbs2$pvalue)
-clust<-as.data.frame(clust)
-subclust <- clust[clust$cluster=="3",]
-for (i in rownames(subclust)){
-  print(i)
-}
-#print(rownames(clust[clust$cluster=="5",]))
-kable(rownames(clust[clust$cluster=="5",]))
-#plotCounts(ddsmbs, gene="mmu-mir-345-5p", intgroup="condition", returnData=TRUE)
-rlog_mouse_blood_small <- assay(rld)
+boxplot(assay(rldb))
+rlog_mouse_blood_small <- assay(rldb)
 meanrldbs<-get_mean(rlog_mouse_blood_small, coldata, "mouse", "blood", "small")
+#Compute clustering on a subset of samples only (e.g. DSS samples)
 filtered_samples=rownames(coldata[coldata$tissue=="blood" & coldata$condition=="DSS" ,])
-rldbf <- rld[,colnames(rld) %in% filtered_samples]
-sig<-return_sig(resmb, resmb2, NULL, 1 , 0.05, 0.05, protein_coding)
-#heatmap_DE_ts(sig,rldb,"mouse","blood","total_protein_coding","Protein coding genes",2)
+rldbf <- rldb[,colnames(rldb) %in% filtered_samples]
 rld<-rldbf; res<-resmbs
 rows <- match(sig$id, row.names(rld))
 mat <- assay(rld)[rows,]
 mat<-t(scale(t(mat)))
 heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","small","miRNAs",3, FALSE)
 set.seed(8)
-km<- kmeans(mat,4,iter.max=1000) # determine how many clusters you want, I specify 2 here
-#Show heatmap for all samples, even if clustering was computing on a subset of samples
+km<- kmeans(mat,5,iter.max=1000) # determine how many clusters you want, I specify 2 here
+#Show heatmap for all samples, even if clustering was computed on a subset of samples
 rld<-rldb
 mat <- assay(rld)[rows,]
 mat<-t(scale(t(mat)))
 m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
-o<- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
-m.kmeans<- m.kmeans[o,] # order the matrix according to the order of the last column
+o <- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans <- m.kmeans[o,] # order the matrix according to the order of the last column
 colnames(m.kmeans)[dim(m.kmeans)[2]] <- c("cluster")
-heatmap_DE_kmeans_ts(sig,rld,m.kmeans[,1:18],"mouse","blood","small","miRNAs",4, FALSE)
-
+heatmap_DE_kmeans_ts(sig,rld,m.kmeans[,1:18],"mouse","blood","small","miRNAs",3, FALSE)
+m.kmeans<-as.data.frame(m.kmeans)
+blood_M72_small<- m.kmeans[m.kmeans$cluster=="1",] 
+kable(rownames(m.kmeans[m.kmeans$cluster=="1",]))
+plotCounts(ddsm, gene="mmu-mir-100-5p", intgroup="condition", returnData=TRUE)
 
 # Pig colon
 #data<-get_data_miRNA_v2("data/mir_W_g0/miRNAs_expressed_all_samples_1544544304.csv", "data/config_pig.txt", 30 , p_selected)
@@ -196,25 +206,53 @@ for (i in rownames(subclust)){
 kable(rownames(clust[clust$cluster=="5",]))
 
 # Mouse blood DSS vs Control day 8
-data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546186982.csv", "data/config_mouse.txt", 24, m_selected)
+data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546186982.csv", "data/config_mouse_rename.txt", 24, m_selected)
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
 blood_samples=rownames(coldata[(coldata$time=="8") & coldata$tissue=="blood",])
-ddsm <- get_deseq(cts, coldata, blood_samples, 1, 0)
+ddsm8 <- get_deseq(cts, coldata, blood_samples, 2, 0)
 #vsd <- varianceStabilizingTransformation(ddsm, blind=FALSE)
-rld <- rlog(ddsm, blind=TRUE)
+rld <- rlog(ddsm8, blind=TRUE)
 meanSdPlot(assay(rld))
-basic_plots(ddsm, rld, "mouse", "blood", "small")
-resmbs<-NULL
-resmbs <- as.data.frame(get_results(ddsm, "mouse", "blood", "small", 1, mh_orth, pm_orth, m_biotypes, m_seq, ""))
-ddsmbs<-ddsm
-res<-resmbs
-#lfcthr=0; pthr=0.05
-#sig <- res[abs(res$logFC)>lfcthr & res$pvalue<pthr, ]
-sig<-return_sig(resmbs, NULL, NULL, 0, 0.05, 1,miRNAs)
-sig<-return_sig(resmbs, NULL, NULL, 0, 1, 1,miRNAs)
-heatmap_DE(sig,rld,"mouse","blood","small","miRNAs","t8")
-hist(resmbs$pvalue)
+basic_plots(ddsm8, rld, "mouse", "blood", "small")
+resmbs8 <- as.data.frame(get_results(ddsm8, "mouse", "blood", "small", 1, mh_orth, pm_orth,m_biotypes,"",m_seq, "",NULL,NULL))
+ddsmbs8<-ddsm8
+sig<-return_sig(resmbs8, NULL, NULL, 0, 0.05, 0.3, miRNAs)
+res<-resmbs; 
+rows <- match(sig$id, row.names(rld))
+mat <- assay(rld)[rows,]
+mat<-t(scale(t(mat)))
+#heatmap_DE_kmeans(sig,rld, mat,"mouse","blood","small","miRNAs",3, FALSE)
+set.seed(8)
+km<- kmeans(mat,2,iter.max=1000) # determine how many clusters you want, I specify 2 here
+m.kmeans<- cbind(mat, km$cluster) # combine the cluster with the matrix
+o <- order(m.kmeans[,dim(m.kmeans)[2]]) # order the last column
+m.kmeans <- m.kmeans[o,] # order the matrix according to the order of the last column
+colnames(m.kmeans)[dim(m.kmeans)[2]] <- c("cluster")
+heatmap_DE_kmeans(sig,rld,m.kmeans[,1:6],"mouse","blood","small","miRNAs",3, FALSE)
+hist(resmbs8$pvalue)
+
+sig8<-return_sig(resmbs8, NULL, NULL, 1, 0.05, 0.9, miRNAs)
+siga<-return_sig(resmbs, NULL, NULL, 1, 0.05, 0.9, miRNAs)
+common_only <- merge(siga, sig8, by="id")
+common <- merge(siga, sig8, by="id", all.x=TRUE, all.y=TRUE)
+m<- common[,c(1,2,7,3,11,16,12)]
+
+plot_gene_time_mir("mmu-mir-20a-5p",resmbs,ddsm)
+plot_gene_time_mir("mmu-let-7i-5p",resmbs,ddsm)
+
+
+plot_gene("mmu-mir-3963","",ddsm8)
+
+a <- dim(siga)[1]
+b <- dim(sig8)[1]
+ab <- dim(common_only)[1]
+grid.newpage()
+plot <- draw.pairwise.venn(a, b, ab, category = c("all samples", "day 8"),cex=2,cat.cex=2, cat.just=list(c(0.2,1), c(1,1)))
+pdf("figures/venn_diagram_blood_mirna.pdf",width=6,height=5) 
+grid.draw(plot);
+dev.off()
+
 
 # Pig blood DSS vs Ctrl, day 4
 data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546252867.csv", "data/config_pig.txt", 30 , p_selected)
@@ -259,3 +297,13 @@ sig<-return_sig(respbs4,respbs2,respbs5, 0, 0.05, 1,miRNAs)
 heatmap_DE_ts(sig,rld,"pig","blood","small","miRNAs")
 
 
+
+#Hierarchical clustering code
+clust<-heatmap_DE_ts_clust(sig,rld,"mouse","blood","small","miRNAs","t8")
+#hist(resmbs2$pvalue)
+clust<-as.data.frame(clust)
+subclust <- clust[clust$cluster=="3",]
+for (i in rownames(subclust)){
+  print(i)
+}
+#print(rownames(clust[clust$cluster=="5",]))

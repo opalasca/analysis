@@ -9,7 +9,7 @@ library(limma)
 library(biomaRt)
 
 # load series and platform data from GEO
-
+# Human long RNA array blood
 acc="GSE94648"
 gset <- getGEO("GSE94648", GSEMatrix =TRUE, AnnotGPL=FALSE)
 if (length(gset) > 1) idx <- grep("GPL19109", attr(gset, "names")) else idx <- 1
@@ -18,14 +18,17 @@ gset <- gset[[idx]]
 # make proper column names to match toptable 
 fvarLabels(gset) <- make.names(fvarLabels(gset))
 
-# group names for all samples
+ #group names for all samples
 gsms <- paste0("11111111111111111222222220000000000000000000000333",
                "33333333333333333333333333333333333333444444444")
 sml <- c()
-#for (i in 1:nchar(gsms)) { sml[i] <- substr(gsms,i,i) }
+for (i in 1:nchar(gsms)) { sml[i] <- substr(gsms,i,i) }
 labels <- c("Control","aUC","iUC","aCD","iCD")
 conditions <- c("C","AUC","IUC","ACD","ICD")
 for (i in 1:nchar(gsms)) { sml[i] <- conditions[as.integer(substr(gsms,i,i))+1] }
+
+
+
 
 # log2 transform
 ex <- exprs(gset)
@@ -55,7 +58,7 @@ cont_names<-c("AUC_vs_C", "IUC_vs_C", "ACD_vs_C", "ICD_vs_C")
 fit2 <- contrasts.fit(fit.unique, cont.matrix)
 fit2 <- eBayes(fit2, 0.01)
 
-pthr = 1; logFCthr = 0
+pthr = 0.1; logFCthr = 1
 for (i in 1:length(cont_names)) {
   tname=cont_names[i]
   tname_merged=paste(cont_names[i],"merged",sep="_")

@@ -22,6 +22,13 @@ library("goseq")
 library(GO.db)
 library(dplyr)
 library(tidyr)
+library(dplyr)
+require(gdata)
+library(data.table)
+require("lsa")
+library("affy")
+library("VennDiagram")
+
 
 #source("http://bioconductor.org/biocLite.R")
 #biocLite("org.Mm.eg.db")
@@ -94,13 +101,14 @@ get_data_miRNA_v2 <- function(counts_file, config_file, n, selected){
   if ("block" %in% colnames(coldata)){
     coldata$block <- as.factor(coldata$block)
   }
-  
   all(rownames(coldata) %in% colnames(cts2))
   cts2 <- cts2[, rownames(coldata)]
   all(rownames(coldata) == colnames(cts2))
   print(nrow(cts2))
   cts2 <- cts2[rownames(cts2) %in% selected,]
   print(nrow(cts2))
+  rownames(coldata)<-coldata$name
+  colnames(cts2)<-coldata$name
   data <- list(cts2, coldata)
   return(data)  
 }
@@ -148,7 +156,7 @@ get_deseq <- function(cts, coldata, sample_list, rowsums, thr){
   dds <- estimateSizeFactors(dds)
   mnc <- rowMeans(counts(dds, normalized=TRUE))
   dds <- dds[mnc > 5,]
-  #dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
+  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   #dds<-dds[rowSums(counts(dds)) >= thr,] 
   print(nrow(dds))
   dds$condition <- relevel(dds$condition, ref = "Control")
@@ -173,6 +181,7 @@ get_deseq_time_cond_merged <- function(cts, coldata, sample_list, rowsums, thr, 
   dds <- estimateSizeFactors(dds)
   mnc <- rowMeans(counts(dds, normalized=TRUE))
   dds <- dds[mnc > 3,]
+  dds<-dds[rowSums( counts(dds) != 0 ) >= rowsums,] 
   print(nrow(dds))
   dds$timecond <- relevel(dds$timecond, ref = "Control")
   dds <- DESeq(dds)
@@ -259,6 +268,7 @@ get_deseq_blood_time_full <- function(cts, coldata, sample_list, rowsums){
   dds <- DESeq(dds, test="LRT", reduced = ~ condition + time)
   return(dds)
 }
+
 # draw basic data exploration plots - heatmap, sample distance, PCA. 
 # vsd can be replaced with other normalization results - e.g. rld, ntd   
 basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){ 
@@ -275,16 +285,6 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   par(mar=c(8,5,2,2))
   boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2)
   dev.off()
-  #Heatmap
-  #select <- order(rowMeans(counts(dds,normalized=TRUE)),
-   #               decreasing=TRUE)[1:20]
-  #df <- as.data.frame(colData(dds)[,c("condition","time")])
-  #df <- as.data.frame(colData(dds)[,c("condition","subject")])
-  #print(df)
-  #x <- pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
-   #           cluster_cols=TRUE, annotation_col=df)
-  #save_pheatmap_pdf(x, paste("figures/heatmap_", org, "_",tissue,"_",type,".pdf", sep="")) 
-  #Samples-distance plot
   sampleDists <- dist(t(assay(vsd)))
   sampleDistMatrix <- as.matrix(sampleDists)
   rownames(sampleDistMatrix) <- paste(rownames(colData(dds)), vsd$condition, sep="-")
@@ -299,29 +299,35 @@ basic_plots <-function(dds, vsd, org, tissue, type, time=FALSE){
   group="condition"
   if (time==TRUE) {group="timecond"}
   print(group)
-if (group=="condition"){
-    plotPCA(vsd, intgroup=c(group)) +
+  if (group=="condition" & org!="human"){
+    p=plotPCA(vsd, intgroup=c(group)) +
     aes(label = name)+
     geom_text_repel(size=3, segment.color = 'transparent')+
     theme(axis.text=element_text(size=13),axis.title=element_text(size=14,face="bold"),
           plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))+
-    scale_x_continuous() +
-    scale_y_continuous()+
-    scale_color_manual(values=c("darkturquoise", "coral1"))
-    #labs(fill="condition")
-}
+      scale_color_manual(values=c("darkturquoise", "coral1"))
+   # p+coord_cartesian(xlim=c(-10,10),ylim=c(-20,20))
+  }
+  else if (group=="condition" & org=="human"){
+    p=plotPCA(vsd, intgroup=c(group)) +
+      aes(label = name)+
+      geom_text_repel(size=0.5, segment.color = 'transparent')+
+      theme(axis.text=element_text(size=13),axis.title=element_text(size=14,face="bold"),
+            plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))+
+      scale_color_manual(values=c("darkturquoise", "coral1", "orange"))
+    # p+coord_cartesian(xlim=c(-10,10),ylim=c(-20,20))
+  }
   else{
-    plotPCA(vsd, intgroup=c(group)) +
+    p=plotPCA(vsd, intgroup=c(group)) +
       aes(label = name)+
       #geom_label_repel()+
       geom_text_repel(size=3)+ #segment.color = 'transparent')+
       theme(axis.text=element_text(size=13),axis.title=element_text(size=14,face="bold"),
             plot.title = element_text(hjust = 0.5,size=20,face="bold"),legend.text = element_text(size=12, face="bold"))+
-      scale_x_continuous() +
-      scale_y_continuous()+
+      #coord_cartesian(xlim=c(-50,50),ylim=c(-50,50))+
       #labs(fill="condition")
       scale_color_manual(values=c("darkturquoise", "chartreuse3", "coral1"))#+
-      #labs(fill="timecond")
+    #p+coord_cartesian(xlim=c(-10,10),ylim=c(-20,20))
   }
   ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".png", sep=""), width=5, height=4, dpi = 1000)
   #ggsave(paste("figures/PCA_", org, "_",tissue,"_",type, ".pdf", sep=""))
@@ -333,15 +339,19 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", bio
   if (timepoint=="" & is.null(cond1)){
     print("no timepoint")
     res <- results(dds,cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald",contrast=c("condition","DSS","Control"))
+    #res <- results(dds, independentFiltering = TRUE, test="Wald",contrast=c("condition","DSS","Control"))
   }
   if (tissue=="blood" & timepoint!="" & is.null(cond1)){
     print("time given")
-    res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
-  }
+   res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald", contrast=c("time",timepoint,"0"))
+   # res <- results(dds,  independentFiltering = TRUE, test="Wald", contrast=c("time",timepoint,"0"))
+      }
   if (!is.null(cond1) & !is.null(cond2)){
     print("time and condition merged")
     res <- results(dds, cooksCutoff=FALSE, independentFiltering = FALSE, test="Wald", contrast=c("timecond",cond1,cond2))
-  }
+    #res <- results(dds,  independentFiltering = TRUE, test="Wald", contrast=c("timecond",cond1,cond2))
+    
+      }
   resOrdered <- as.data.frame(res[order(abs(res$log2FoldChange)),])
   names(resOrdered)[names(resOrdered) == "log2FoldChange"] = "logFC"
   names(resOrdered)[names(resOrdered) == "baseMean"] = "avg.expr"
@@ -368,7 +378,7 @@ get_results <- function(dds, org, tissue, type, thr, orth1="mm", orth2="pp", bio
     #rs<-unique(rs)
     write.table(rs, file=paste("results/", org, "_", tissue, "_",type, "_", "full", "_", now, spec,".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
     #write.table(resOrdered[c(1,2,3,6,7,12,8,9,10,11)], file=paste("results/", org, "_", tissue, "_",type, "_", "full", "_", now, ".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
-    write.table(rs[abs(rs$logFC)>=1 & rs$padj<=0.05,], file=paste("results/", org, "_", tissue, "_",type, "_", "padj_0.05_logFC_1", "_", now, spec,".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
+    write.table(rs[abs(rs$logFC)>=1.5 & rs$padj<=0.05,], file=paste("results/", org, "_", tissue, "_",type, "_", "padj_0.05_logFC_1.5", "_", now, spec,".tsv", sep=""), sep="\t", row.names = FALSE, quote = F)
     resOrdered <- merge(resOrdered, biotypes, by.x='id',by.y='id', all.x=TRUE)
     }
   #resOrdered_uc_co<-resOrdered_uc_co[resOrdered_uc_co$padj < thr,]
@@ -468,7 +478,57 @@ plot_gene <- function(gene,gene_name,dds){
     geom_text_repel() +
     ggtitle(paste(gene,gene_name,sep=", ")) +
     theme(plot.title = element_text(hjust = 0.5))
-  ggsave(paste("figures/", gene_name, ".png", sep=""), width=5, height=4, dpi = 1000)
+  ggsave(paste("figures/", gene, ".png", sep=""), width=5, height=4, dpi = 1000)
+  plot(p1)
+} 
+
+plot_gene <- function(gene,gene_name,dds){
+  #https://github.com/hbctraining/DGE_workshop/blob/master/lessons/06_DGE_visualizing_results.md
+  #pdf(file=paste("figures/",gene,".pdf",sep="")) 
+  p <- plotCounts(dds, gene=gene, intgroup="condition", returnData=TRUE)
+  # Plotting the gene normalized counts, using the samplenames (rownames of d as labels)
+  p1<-ggplot(p, aes(x = condition, y = count, color = condition, fill = condition)) + 
+    geom_dotplot(binaxis="y", stackdir="center")+
+    aes(label = rownames(p)) +
+    geom_text_repel() +
+    ggtitle(paste(gene,gene_name,sep=", ")) +
+    theme(plot.title = element_text(hjust = 0.5))
+  ggsave(paste("figures/", gene, ".png", sep=""), width=5, height=4, dpi = 1000)
+  plot(p1)
+} 
+
+plot_gene_time <- function(gene,res,dds){
+  #https://github.com/hbctraining/DGE_workshop/blob/master/lessons/06_DGE_visualizing_results.md
+  #pdf(file=paste("figures/",gene,".pdf",sep="")) 
+  gene_name=res[res$id==gene,]$Gene.Name
+  p <- plotCounts(dds, gene=gene, intgroup="timecond", returnData=TRUE)
+  # Plotting the gene normalized counts, using the samplenames (rownames of d as labels)
+  p1<-ggplot(p, aes(x = timecond, y = count, fill = timecond)) + 
+    geom_dotplot(binaxis="y", stackdir="center")+
+    aes(label = rownames(p)) +
+    geom_text_repel() +
+    ggtitle(paste(gene,gene_name,sep=", ")) +
+    scale_color_manual(values=c("darkturquoise", "chartreuse3", "coral1")) +
+    scale_fill_manual(values=c("darkturquoise", "chartreuse3", "coral1")) +
+    theme(plot.title = element_text(hjust = 0.5))
+  ggsave(paste("figures/", gene, ".png", sep=""), width=5, height=4, dpi = 1000)
+  plot(p1)
+} 
+
+plot_gene_time_mir <- function(gene,res,dds){
+  #https://github.com/hbctraining/DGE_workshop/blob/master/lessons/06_DGE_visualizing_results.md
+  #pdf(file=paste("figures/",gene,".pdf",sep="")) 
+  p <- plotCounts(dds, gene=gene, intgroup="timecond", returnData=TRUE)
+  # Plotting the gene normalized counts, using the samplenames (rownames of d as labels)
+  p1<-ggplot(p, aes(x = timecond, y = count, fill = timecond)) + 
+    geom_dotplot(binaxis="y", stackdir="center")+
+    aes(label = rownames(p)) +
+    geom_text_repel() +
+    ggtitle(paste(gene)) +
+    scale_color_manual(values=c("darkturquoise", "chartreuse3", "coral1")) +
+    scale_fill_manual(values=c("darkturquoise", "chartreuse3", "coral1")) +
+    theme(plot.title = element_text(hjust = 0.5))
+  ggsave(paste("figures/", gene, ".png", sep=""), width=5, height=4, dpi = 1000)
   plot(p1)
 } 
 
@@ -732,7 +792,8 @@ heatmap_DE_kmeans <- function(sig, rld, mat, org, tissue, type, title, clusters,
                 #cluster_rows=TRUE,
                 cluster_rows=cluster_rows,
                 cluster_cols =FALSE, 
-                show_rownames=FALSE,
+                #show_rownames=FALSE,
+                show_rownames=TRUE,
                 method="ward.D",
                 #show_colnames=FALSE,
                 show_legend=FALSE,
@@ -765,7 +826,9 @@ heatmap_DE_kmeans_ts <- function(sig, rld, mat, org, tissue, type, title, cluste
                 #cluster_rows=TRUE,
                 cluster_rows=cluster_rows,
                 cluster_cols =FALSE, 
-                show_rownames=FALSE,
+                #show_rownames=FALSE,
+                show_rownames=TRUE,
+                
                 show_legend=FALSE,
                 annotation_col=df,
                 annotation_colors = time_colors,
@@ -1129,7 +1192,9 @@ get_mean<-function(rld,coldata,org,tissue,type){
 get_gene_correlations <- function(df1,df2,mmu_pred){
   #df1 small rna, fd2 long rna
   df1<-df1[!grepl("^.+(mt|st)$",rownames(df1)),]
-  c<-(cor(t(df2), t(df1), method="spearman"))
+ 
+  #c<-(cor(t(df2), t(df1), method="spearman"))
+  c<-(cor(t(df2), t(df1), method="pearson"))
   #c<-(cos.sim(df2, df1))
   c<-melt(c)
   c<-data.table(c, keep.rownames = TRUE)
@@ -1160,27 +1225,65 @@ go_term_enrichment_list <- function(clust, res, padjthr, org, tissue, cluster_no
   png(paste("tables/go_top_", org, "_", tissue, ".png", sep=""),height = 30*nrow(d), width =150*ncol(d))
   #grid.table(d,rows=NULL)
   dev.off()
-  
   return(GOsig)
 }
 
+go_term_enrichment_v2 <- function(gene_list, res, padjthr, org, tissue ){
+  res <- res[complete.cases(res),]
+  #assayed.genes <- res$Human.gene.stable.ID
+  #de.genes <- res$Human.gene.stable.ID[which(res$id %in% rownames(clust[clust$cluster==cluster_no,]))]
+  assayed.genes <- res$id
+  de.genes <- gene_list$id
+  print(de.genes)
+  gene.vector <- as.integer(assayed.genes%in%de.genes)
+  names(gene.vector) = assayed.genes
+  table(gene.vector)
+  #pwf=nullp(gene.vector,"hg19","ensGene") 
+  #GO.wall=goseq(pwf,"hg19","ensGene",test.cats=c("GO:MF","GO:BP"))
+  pwf=nullp(gene.vector,"mm9","ensGene") 
+  GO.wall=goseq(pwf,"mm9","ensGene")#,test.cats=c("GO:MF","GO:BP"))
+  GO.wall$padj <- p.adjust(GO.wall$over_represented_pvalue,method="BH")
+  GOsig <- subset(GO.wall, padj <= padjthr)
+  write.table(GOsig[,c(6,8,4,5)], file=paste("results/lnc_gba_go_term_enrichment_", org, "_", tissue, ".tsv", sep=""), sep="\t", row.names = FALSE, quote = FALSE)
+  d <- GOsig[1:20,c(6,8,4,5)]
+  png(paste("tables/go_top_", org, "_", tissue, ".png", sep=""),height = 30*nrow(d), width =150*ncol(d))
+  #grid.table(d,rows=NULL)
+  dev.off()
+  return(GOsig)
+}
+
+
 library("ggplot2") #Best plots
 library("ggrepel") #Avoid overlapping labels
-draw_volcano <- function(org, tissue, type, res, pthr, lfcthr){
+draw_volcano <- function(org, tissue, type, res, pthr, lfcthr,title){
   yourdataframe=res
-  mutateddf <- mutate(yourdataframe, sig=ifelse(yourdataframe$padj<pthr & abs(yourdataframe$logFC)>lfcthr, "padj<0.05 & logFC>1", "not signif")) #Will have different colors depending on significance
-  input <- cbind(gene=mutateddf$Gene.Name, mutateddf ) #convert the rownames to a column
+  mutateddf <- yourdataframe %>%
+    mutate(sig = factor(case_when(padj < pthr & logFC < -lfcthr ~ "downregulated",
+                                      padj < pthr & logFC > lfcthr ~ "upregulated",
+                                      TRUE ~ "not significant")))
+  if (type=="total"){
+    input <- cbind(gene=mutateddf$Gene.Name, mutateddf ) #convert the rownames to a column
+    pointsize=0.5
+  }
+  else{
+    input <- cbind(gene=mutateddf$partial_id, mutateddf ) #convert the rownames to a column
+    pointsize=1
+  }
   insig <- input[input$padj<0.05,]
-  inup<-head(insig[order(-insig$logFC),],20)
-  indown<-head(insig[order(insig$logFC),],20)
+  inup<-head(insig[order(-insig$logFC),],10)
+  indown<-head(insig[order(insig$logFC),],10)
   inall<-rbind(indown,inup)
-  volc = ggplot(input, aes(logFC, -log10(pvalue))) + #volcanoplot with log2Foldchange versus pvalue
-    geom_point(aes(col=sig),size=0.5) + #add points colored by significance
-    scale_color_manual(values=c("grey", "red")) + 
-    ggtitle(tissue) #e.g. 'Volcanoplot DESeq2'
-  volc+geom_text_repel(data=head(inall, 40), aes(label=gene), size=2.5, segment.color = NA) #adding text for the top 20 genes
+  volc = ggplot(input, aes(logFC, -log10(padj))) + #volcanoplot with log2Foldchange versus pvalue
+    geom_point(aes(col=sig),size=pointsize) + #add points colored by significance
+    geom_vline(xintercept=c(-lfcthr,lfcthr), color="grey", linetype=2, alpha=0.2)+ 
+    geom_hline(yintercept=-log10(pthr), color="grey", linetype=2, alpha=0.2)+ 
+    scale_color_manual(name = "",
+                       values = c("upregulated" = "coral", "downregulated" = "deepskyblue3", "not significant" = "grey"))+
+    ggtitle(paste(tissue,title,sep=" "))  #e.g. 'Volcanoplot DESeq2'
+  volc + coord_cartesian(xlim=c(-20,20),ylim=c(0,50))
+  volc+geom_text_repel(data=head(inall, 20), aes(label=gene), size=2, segment.color = NA) #adding text for the top 20 genes
   #+geom_text_repel(data=head(indown, 10), aes(label=gene)) #adding text for the top 20 genes
-  ggsave(paste("figures/Volcanoplot_",org, "_", tissue,"_",type,".jpeg",sep=""), device="jpeg") #In case you want to easily save to disk
+  ggsave(paste("figures/Volcanoplot_",org, "_", tissue,"_",type,"_",title,".jpeg",sep=""), device="jpeg") #In case you want to easily save to disk
   volc
 }
 
