@@ -21,7 +21,7 @@ miRNAs=c("miRNA")
 # Mouse colon #
 ###############
 #data<-get_data_miRNA_v2("data/mir_g1/miRNAs_expressed_all_samples_1545223185.csv", "data/config_mouse.txt", 24, m_selected)
-data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546186982.csv", "data/config_mouse.txt", 24, m_selected)
+data<-get_data_miRNA_v2("data/mir_g1_s_option/miRNAs_expressed_all_samples_1546186982.csv", "data/config_mouse_rename.txt", 24, m_selected)
 cts<-NULL; coldata<-NULL
 cts<-data[[1]]; coldata<-data[[2]]
 coldata<-coldata[order(coldata$condition,coldata$time),]
@@ -39,7 +39,7 @@ hist(resmcs$pvalue)
 rlog_mouse_colon_small <- assay(rldc)
 meanrldcs<-get_mean(rlog_mouse_colon_small, coldata, "mouse", "colon", "small")
 draw_volcano("mouse","colon", "small",resmcs, 0.1, 1,"")
-sig<-return_sig(resmcs, NULL, NULL, 0.5, 0.05, 0.1, miRNAs)
+sig<-return_sig(resmcs, NULL, NULL, 0.5, 0.05, 0.4, miRNAs)
 rld<-rldc; res<-resmcs
 rows <- match(sig$id, row.names(rld))
 mat <- assay(rld)[rows,]

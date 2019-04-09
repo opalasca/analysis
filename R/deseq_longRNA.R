@@ -9,8 +9,8 @@ m_orth <- read.csv(m_orth_file, header=TRUE, sep="\t")
 p_orth <- read.csv(p_orth_file, header=TRUE, sep="\t")
 mh_lncRNA_orth <- read.csv("data/lncRNA_mouse_human_orthologs.tsv", header=TRUE, sep="\t")
 mh_lncRNA_orth <- mh_lncRNA_orth[,c(5,2,1)]
-names(mh_lncRNA_orth) <- names(mh_orth)
 mh_orth <- get_orth_table(m_orth, 5, c(1,3,4)) 
+names(mh_lncRNA_orth) <- names(mh_orth)
 mh_orth <- rbind(mh_orth,mh_lncRNA_orth)
 mh_orth <- unique(mh_orth)
 mp_orth <- get_orth_table(m_orth, 8, c(1,6,7))
@@ -111,7 +111,7 @@ write.table(tclust, file=paste("results/expression_clusters_", "mouse", "_", "co
 #go_clust5 <- go_term_enrichment_list(clust,res,0.5,"mouse","blood","5")
 #sig_clust <- sig[sig$id %in% rownames(clust[clust$cluster=="1",]),]
 #heatmap_DE(sig_clust,rldc,"mouse","colon","total_protein_coding","Protein coding genes",2, TRUE)
-sig<-return_sig(resmc, NULL, NULL, 1.5, 0.05, 0.05, lncRNAs)
+sig<-return_sig(resmc, NULL, NULL, 1, 0.05, 0.05, lncRNAs)
 rows <- match(sig$id, row.names(rld))
 mat <- assay(rld)[rows,]
 mat<-t(scale(t(mat)))
@@ -522,7 +522,7 @@ sig<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.05, protein_coding)
 #heatmap_DE(sig,rldb,"mouse","blood","total_lncRNA","LncRNAs",2, TRUE)
 sig<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.05, protein_coding)
 sig_pc_day8<-return_sig(resmb, NULL, NULL, 1.5, 0.05, 0.05, protein_coding)
-sig_lnc_day8<-return_sig(resmb, NULL, NULL, 1.5, 0.05, 0.05, lncRNAs)
+sig_lnc_day8<-return_sig(resmb, NULL, NULL, 1, 0.05, 0.05, lncRNAs)
 rld<-rldb; res<-resmb
 rows <- match(sig$id, row.names(rld))
 mat <- assay(rld)[rows,]
